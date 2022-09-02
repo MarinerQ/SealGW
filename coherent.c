@@ -250,6 +250,7 @@ void create_healpix_skygrids_from_file(int nside, double *ra_grids, double *dec_
 }
 
 void load_healpix_skygrids_from_file()
+/// Creates a set of healpix skygrids for each order of 2 from 2**4 to 2**10 and
 {
 	if(LOAD_SKYGRIDS==1){
 		printf("you already load the skygrids\n");
@@ -267,6 +268,7 @@ void load_healpix_skygrids_from_file()
 		double *dec_grids = (double*)malloc(sizeof(double)*npix);
 		
 		create_healpix_skygrids_from_file(nside[i],ra_grids,dec_grids);
+
 		if(nside[i]==16){
 			healpix_skygrids_nside_16 = (double*)malloc(sizeof(double)*npix*2);
 			my_memcpy_double(healpix_skygrids_nside_16,ra_grids,npix);

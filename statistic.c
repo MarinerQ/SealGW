@@ -253,6 +253,8 @@ void coherent_analysis()
 {
 	load_healpix_skygrids_from_file();
 
+	
+	// https://lscsoft.docs.ligo.org/lalsuite/lal/_l_a_l_detectors_8h_source.html#l00168
 	LALDetector L1 = lalCachedDetectors[5];
 	LALDetector H1 = lalCachedDetectors[4];
 	LALDetector V1 = lalCachedDetectors[1];
@@ -308,45 +310,6 @@ void coherent_analysis()
 	char v1_snr_filename[128];
 	char skymap_filename[128];
 	double sigma[3];
-
-	/*
-	if(use_spiir){
-		if (i_data == 0) {
-		sprintf(l1_snr_filename,"snr_data/spiir_data/snr_detector_0_ID_%d.txt",0);//only stored snr during event_time +- 1s
-		sprintf(h1_snr_filename,"snr_data/spiir_data/snr_detector_1_ID_%d.txt",0);
-		sprintf(v1_snr_filename,"snr_data/spiir_data/snr_detector_2_ID_%d.txt",0);
-		//sigma={1704.32,1138.32,478.88};  //[213.04 142.29 59.86]*8, from SPIIR
-		//sigma[0] = 1704.32; sigma[1] = 1138.32; sigma[2] = 478.88;
-		sigma[0] = 220.41*8; sigma[1] = 106.65*8; sigma[2] = 58.36*8; //Chichi lowH1
-		} else if (i_data == 1) {
-		sprintf(l1_snr_filename,"snr_data/4096data/snr_detector_0_ID_%d.txt",0);//only stored snr during event_time +- 1s
-		sprintf(h1_snr_filename,"snr_data/4096data/snr_detector_1_ID_%d.txt",0);
-		sprintf(v1_snr_filename,"snr_data/4096data/snr_detector_2_ID_%d.txt",0);
-		// need to change number of samples, so that dt is correct
-		ntime = 82;
-		} else {
-		sprintf(skymap_filename,"skymap/skymap_spiirsnr_40null.txt");
-		sprintf(l1_snr_filename,"snr_data/lowH1data/snr_detector_0_ID_%d.txt",0);//only stored snr during event_time +- 1s
-		sprintf(h1_snr_filename,"snr_data/lowH1data/snr_detector_1_ID_%d.txt",0);
-		sprintf(v1_snr_filename,"snr_data/lowH1data/snr_detector_2_ID_%d.txt",0);
-		sigma[0] = 220.41*8; sigma[1] = 106.65*8; sigma[2] = 58.36*8; //Chichi lowH1
-		}
-		sprintf(skymap_filename,"skymap/skymap_spiirsnr_40null.txt");
-		
-		//sigma[0] = 1704.32; sigma[1] = 1138.32; sigma[2] = 478.88;
-		//sigma[0] = 1709.84; sigma[1] = 1046.4; sigma[2] = 460.16;
-		//sigma[0] = 213*8; sigma[1] = 112*8; sigma[2] = 57*8;  // from SPIIR userguide
-		//sigma[0] = 218*8; sigma[1] = 107*8; sigma[2] = 58*8;  // from PRL 119, 161101 (2017)
-	}
-	else{
-		sprintf(l1_snr_filename,"snr_data/snr_detector_0_ID_%d.txt",i_data);//only stored snr during event_time +- 1s
-		sprintf(h1_snr_filename,"snr_data/snr_detector_1_ID_%d.txt",i_data);
-		sprintf(v1_snr_filename,"snr_data/snr_detector_2_ID_%d.txt",i_data);
-		sprintf(skymap_filename,"skymap/skymap_manojsnr_multires_withoutnull.txt");
-		//sigma={1709.84,1046.4,460.16};  //[213.73 130.80 57.52]*8, from Manoj
-		sigma[0] = 1709.84; sigma[1] = 1046.4; sigma[2] = 460.16;
-	}*/
-
 
 	sprintf(l1_snr_filename,"data/snr_data/4096data/snr_detector_0_ID_%d.txt",0);//only stored snr during event_time +- 1s 4096data/
 	sprintf(h1_snr_filename,"data/snr_data/4096data/snr_detector_1_ID_%d.txt",0);

@@ -2,6 +2,7 @@
 #define _coherent_h
 
 #include <lal/LALDetectors.h>
+#include <lal/LALDatatypes.h>
 
 typedef struct tagTimeSeries{
 	int npoint;
@@ -10,10 +11,22 @@ typedef struct tagTimeSeries{
 	double complex *data;
 } time_series;
 
+typedef struct tagTimeSeries2{
+	int npoint;
+	double start_time;
+	double delta_t;
+	double complex *data;
+} time_series2;
+
 typedef struct tagDataStreams{
 	int Nstream;
 	time_series **streams;
 } data_streams;
+
+typedef struct tagDataStreams2{
+	int Nstream;
+	COMPLEX8TimeSeries **streams;
+} data_streams2;
 
 data_streams* create_data_streams(int Ndet);
 

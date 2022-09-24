@@ -361,6 +361,8 @@ void coherent_analysis()
 	time_series *h1_snr = readsnr2time_series(h1_snr_filename);
 	time_series *v1_snr = readsnr2time_series(v1_snr_filename);
 
+	COMPLEX8TimeSeries *l1_snr_lal = 
+
 	//convart the matched filter output into data_streams
 	data_streams *strain_data = create_data_streams(Ndet);
 	strain_data->streams[0] = l1_snr;
@@ -479,5 +481,6 @@ int main(int argc,char *argv[])
 {
 	int i;
 	//for(i=0;i<argc;i++) printf("%d\n",atoi(argv[i]));
+	//snr_generator(atoi(argv[1]));
 	coherent_analysis();
 }

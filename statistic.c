@@ -348,9 +348,9 @@ void coherent_analysis()
 	}*/
 
 
-	sprintf(l1_snr_filename,"snr_data/4096data/snr_detector_0_ID_%d.txt",0);//only stored snr during event_time +- 1s 4096data/
-	sprintf(h1_snr_filename,"snr_data/4096data/snr_detector_1_ID_%d.txt",0);
-	sprintf(v1_snr_filename,"snr_data/4096data/snr_detector_2_ID_%d.txt",0);
+	sprintf(l1_snr_filename,"data/snr_data/4096data/snr_detector_0_ID_%d.txt",0);//only stored snr during event_time +- 1s 4096data/
+	sprintf(h1_snr_filename,"data/snr_data/4096data/snr_detector_1_ID_%d.txt",0);
+	sprintf(v1_snr_filename,"data/snr_data/4096data/snr_detector_2_ID_%d.txt",0);
 	sprintf(skymap_filename,"skymap/skymap_paper.txt");
 	// need to change number of samples, so that dt is correct
 	// ntime = 820;

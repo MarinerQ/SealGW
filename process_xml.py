@@ -13,7 +13,7 @@ import numpy as np
 import spiir  # quite slow to import?
 
 data_dir = Path("data/coinc_xml/")
-coinc_xml = data_dir / "H1L1V1_1344284404_273_202.xml"
+coinc_xml = data_dir / "H1L1V1_1187008882_3_806.xml"  # or H1L1_...
 
 xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(coinc_xml)
 
@@ -43,7 +43,7 @@ for det in det_names:
     np.savetxt('data/snr_data/snr_'+det, snr_to_save)
 
 # Save event info
-# trigger_time, ndet,    detname1, ..., detnameN,    max_snr1, ..., max_snrN,    sigma1, ..., sigmaN
+# trigger_time, ndet,    detcode1, ..., detcodeN,    max_snr1, ..., max_snrN,    sigma1, ..., sigmaN
 # 1+1+N+N+N = 3N+2 elements
 event_info = np.array([trigger_time, ndet])
 

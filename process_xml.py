@@ -13,11 +13,7 @@ import numpy as np
 import spiir  # quite slow to import?
 
 data_dir = Path("data/coinc_xml/")
-<<<<<<< HEAD
 coinc_xml = data_dir / "H1L1V1_1187008882_3_806.xml"  # or H1L1_...
-=======
-coinc_xml = data_dir / "H1L1V1_1344284404_273_202.xml"
->>>>>>> c08d6dfcc6835af171761333f83cd819e96801c2
 
 xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(coinc_xml)
 

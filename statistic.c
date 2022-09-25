@@ -253,25 +253,77 @@ void coherent_analysis()
 {
 	load_healpix_skygrids_from_file();
 
-	
-	// https://lscsoft.docs.ligo.org/lalsuite/lal/_l_a_l_detectors_8h_source.html#l00168
-	LALDetector L1 = lalCachedDetectors[5];
-	LALDetector H1 = lalCachedDetectors[4];
-	LALDetector V1 = lalCachedDetectors[1];
+	double event_info[32]; 
+	char event_info_filename[128];
+	sprintf(event_info_filename,"data/event_info");
+	read_event_info(event_info_filename, event_info);
 
-	LALDetector detectors[ ] = {L1,H1,V1};
+	double trigger_time = event_info[0];
+	double dt = 1/2048.0;
+	double start_time = trigger_time - 0.01;
+	double end_time   = trigger_time + 0.01;
+	int ntime = (int) 1/dt*0.02*10; // say, 4096Hz * 20ms *10
+
+
+	
+	int Ndet= (int) event_info[1];
+	int detnum, detcode;
+	LALDetector detectors[Ndet];
+	LALDetector tempdet;
+	//char l1_snr_filename[128];
+	//char h1_snr_filename[128];
+	//char v1_snr_filename[128];
+	char snr_filenames[Ndet][128];
+	double sigma[Ndet];
+	double maxsnr[Ndet];
+	for(detnum=0; detnum<Ndet; detnum++){
+		// load detectors
+		detcode = (int)event_info[2+detnum];
+		//printf("\n\ndetcode: %d\n\n", detcode);
+		tempdet = lalCachedDetectors[detcode];
+		detectors[detnum] = tempdet;
+
+		// read SNR filenames
+		sprintf(snr_filenames[detnum],"data/snr_data/snr_det%d",detcode);
+
+		// read max SNRs
+		maxsnr[detnum] = event_info[2+detnum+Ndet];
+		
+		// read sigmas
+		sigma[detnum] = event_info[2+detnum+2*Ndet];
+	}
+	
+	
+
+	// generate data streams
+	data_streams *strain_data = create_data_streams(Ndet);
+	time_series *temp_snr;
+	for(detnum=0; detnum<Ndet; detnum++){
+		temp_snr = readsnr2time_series(snr_filenames[detnum]);
+		strain_data->streams[detnum] = temp_snr;
+	}
+	//time_series *l1_snr = readsnr2time_series(l1_snr_filename);
+	//time_series *h1_snr = readsnr2time_series(h1_snr_filename);
+	//time_series *v1_snr = readsnr2time_series(v1_snr_filename);
+
+	//COMPLEX8TimeSeries *l1_snr_lal = 
+	//strain_data->streams[0] = l1_snr;
+	//strain_data->streams[1] = h1_snr;
+	//strain_data->streams[2] = v1_snr;
+
+
+
 	
 	int ndata=1;
-	int Ndet=3;
 	// What is the finest resolution you want
 	int nlevel=6;
 	// How many threads you want to use?
 	int nthread=1;
 	int nside = 16*pow(2,nlevel);
 	int npix  = 12*nside*nside;
-	double start_time = 1187008882.42;
-	double end_time   = 1187008882.44;
-	int ntime = 820; // 4096Hz * 20ms *10
+	
+	
+	
 	
 	//statistic
 	double statis_cohsnr_qian[ndata];
@@ -292,45 +344,14 @@ void coherent_analysis()
 	int save_skymap=1;
 	int save_statistic=0;
 
-	int use_spiir = 1;
-	int use_4096 = 0;
 
 	#pragma omp parallel num_threads(nthread)
 	{
 	int i_thread = omp_get_thread_num();
-	// i_data == 0: GW170817 2K data, C02
 	int i, i_data = 0;
-	//printf("Enter a value to select SNR data: \n\t 0 for 2K C02 SPIIR SNR (H1 horizion 142),\n"
-	//		"\t 1 for 4k C02 SNR,\n"
-	//		"\t 2 for 2k C01 SNR (H1 horizon 106).\n");
-	//scanf("%d", &i_data);
-	
-	char l1_snr_filename[128];
-	char h1_snr_filename[128];
-	char v1_snr_filename[128];
 	char skymap_filename[128];
-	double sigma[3];
-
-	sprintf(l1_snr_filename,"data/snr_data/4096data/snr_detector_0_ID_%d.txt",0);//only stored snr during event_time +- 1s 4096data/
-	sprintf(h1_snr_filename,"data/snr_data/4096data/snr_detector_1_ID_%d.txt",0);
-	sprintf(v1_snr_filename,"data/snr_data/4096data/snr_detector_2_ID_%d.txt",0);
 	sprintf(skymap_filename,"skymap/skymap_paper.txt");
-	// need to change number of samples, so that dt is correct
-	// ntime = 820;
-	//sigma[0] = 213*8; sigma[1] = 142*8; sigma[2] = 60*8;
-	sigma[0] = 1704.32; sigma[1] = 1138.32; sigma[2] = 478.88;
 	
-	time_series *l1_snr = readsnr2time_series(l1_snr_filename);
-	time_series *h1_snr = readsnr2time_series(h1_snr_filename);
-	time_series *v1_snr = readsnr2time_series(v1_snr_filename);
-
-	COMPLEX8TimeSeries *l1_snr_lal = 
-
-	//convart the matched filter output into data_streams
-	data_streams *strain_data = create_data_streams(Ndet);
-	strain_data->streams[0] = l1_snr;
-	strain_data->streams[1] = h1_snr;
-	strain_data->streams[2] = v1_snr;
 
 	//calculate the skymap in adaptive way with multi-resolution
 	//double *coh_skymap_multires_alan = coh_skymap_multiRes_alan(strain_data,detectors,sigma,start_time,end_time,ntime,nlevel);

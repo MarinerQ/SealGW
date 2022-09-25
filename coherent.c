@@ -237,6 +237,26 @@ void read_sigma(char *filename, double *sigma)
 	printf("---------------------------------------\n");
 }
 
+void read_event_info(char *filename, double *event_info)
+{
+	int npoint;
+
+	//read data from txt
+	FILE *ft_r = fopen(filename,"r");
+	if(ft_r==NULL){
+		printf("Can not find event info file!\n");
+		exit(-1);
+	}
+	
+	npoint=0;
+	double info_temp;
+	while(fscanf(ft_r,"%lf",&info_temp)!=EOF){
+		event_info[npoint]  = info_temp;
+		npoint++;
+	}
+	fclose(ft_r);
+}
+
 void create_healpix_skygrids_from_file(int nside, double *ra_grids, double *dec_grids)
 {
 	if(ra_grids==NULL || dec_grids==NULL){

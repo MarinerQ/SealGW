@@ -6,14 +6,15 @@
 
 # The process may be faster if we do the above in C code. 
 
-print('\nProcessing .xml file...')
 from pathlib import Path
 import pandas as pd
 import numpy as np
 import spiir  # quite slow to import?
 
+print('\nProcessing .xml file...')
+
 data_dir = Path("data/coinc_xml/")
-coinc_xml = data_dir / "H1L1V1_1187008882_3_806.xml"  # or H1L1_...
+coinc_xml = data_dir / "H1L1_1187008882_3_806.xml"  # or H1L1_...
 
 xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(coinc_xml)
 
@@ -34,31 +35,30 @@ timestamp = xmlfile['snrs'][det].index.to_numpy()
 snr_timeseries_dict = xmlfile['snrs']
 netsnr_timeseries = sum([abs(snr_timeseries_dict[det]) ** 2 for det in det_names])
 trigger_time = timestamp[np.argmax(netsnr_timeseries)]
-
-
-
-# Save SNR
-for det in det_names:
-    snr_to_save = np.array([timestamp, np.real(snr_timeseries_dict[det]), np.imag(snr_timeseries_dict[det])]).T 
-    np.savetxt('data/snr_data/snr_'+det, snr_to_save)
+#trigger_time = timestamp[np.argmax(abs(snr_timeseries_dict['L1']))]
 
 # Save event info
-<<<<<<< HEAD
 # trigger_time, ndet,    detcode1, ..., detcodeN,    max_snr1, ..., max_snrN,    sigma1, ..., sigmaN
-=======
-# trigger_time, ndet,    detname1, ..., detnameN,    max_snr1, ..., max_snrN,    sigma1, ..., sigmaN
->>>>>>> c08d6dfcc6835af171761333f83cd819e96801c2
 # 1+1+N+N+N = 3N+2 elements
 event_info = np.array([trigger_time, ndet])
 
+# Here detector code is for old version of LAL(6.49.0), see:
+# /fred/oz016/opt-pipe/include/lal/LALDetectors.h
+# Be careful when chenge to new version - the code is different, see:
 # https://lscsoft.docs.ligo.org/lalsuite/lal/_l_a_l_detectors_8h_source.html#l00168
-lal_det_code = {'L1': 6, 'H1': 5, 'V1':2, 'K1': 14, 'I1': 15}  # Are "K1", "I1" the right names for SPIIR?
+lal_det_code = {'L1': 5, 'H1': 4, 'V1':1, 'K1': 16, 'I1': 17}  
 det_code_array = np.array([])
 for det in det_names:
     event_info = np.append(event_info, lal_det_code[det])
 event_info = np.append(event_info, max_snr_array)
 event_info = np.append(event_info, sigma_array)
 np.savetxt('data/event_info', event_info)
+
+
+# Save SNR
+for det in det_names:
+    snr_to_save = np.array([timestamp, np.real(snr_timeseries_dict[det]), np.imag(snr_timeseries_dict[det])]).T 
+    np.savetxt('data/snr_data/snr_det{}'.format(lal_det_code[det]), snr_to_save)
 
 
 print('Trigger time: ',trigger_time)

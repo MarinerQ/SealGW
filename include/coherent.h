@@ -46,6 +46,8 @@ void read_skygrids(char *filename, double *ra, double *dec);
 
 void read_sigma(char *filename, double *sigma);
 
+void read_event_info(char *filename, double *event_info);
+
 void create_healpix_skygrids_from_file(
 				int nside, 
 				double *ra_grids, 

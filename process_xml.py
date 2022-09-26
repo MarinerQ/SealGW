@@ -14,7 +14,7 @@ import spiir  # quite slow to import?
 print('\nProcessing .xml file...')
 
 data_dir = Path("data/coinc_xml/")
-coinc_xml = data_dir / "H1L1_1187008882_3_806.xml"  # or H1L1_...
+coinc_xml = data_dir / "H1L1V1_1187008882_3_806.xml"  # or H1L1_...
 
 xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(coinc_xml)
 
@@ -57,7 +57,7 @@ np.savetxt('data/event_info', event_info)
 
 # Save SNR
 for det in det_names:
-    snr_to_save = np.array([timestamp, np.real(snr_timeseries_dict[det]), np.imag(snr_timeseries_dict[det])]).T 
+    snr_to_save = np.array([timestamp, np.real(snr_timeseries_dict[det]), 1*np.imag(snr_timeseries_dict[det])]).T 
     np.savetxt('data/snr_data/snr_det{}'.format(lal_det_code[det]), snr_to_save)
 
 

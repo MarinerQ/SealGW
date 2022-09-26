@@ -260,9 +260,12 @@ void coherent_analysis()
 
 	double trigger_time = event_info[0];
 	double dt = 1/2048.0;
+	//dt = 1/4096.0;
 	double start_time = trigger_time - 0.01;
+	//start_time = 1187008882.42;
 	double end_time   = trigger_time + 0.01;
-	int ntime = (int) 1/dt*0.02*10; // say, 4096Hz * 20ms *10
+	//end_time = 1187008882.44;
+	int ntime = (int) 1/dt*0.02*10; // say, 2048Hz * 20ms *10
 
 
 	
@@ -284,6 +287,7 @@ void coherent_analysis()
 		detectors[detnum] = tempdet;
 
 		// read SNR filenames
+		//sprintf(snr_filenames[detnum],"data/snr_data/old_test_data/4096data/snr_det%d",detcode);
 		sprintf(snr_filenames[detnum],"data/snr_data/snr_det%d",detcode);
 
 		// read max SNRs

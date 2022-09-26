@@ -13,7 +13,8 @@ import spiir  # quite slow to import?
 
 print('\nProcessing .xml file...')
 
-data_dir = Path("data/coinc_xml/")
+#data_dir = Path("data/coinc_xml/")
+data_dir = Path("/fred/oz016/qian/test/")
 coinc_xml = data_dir / "H1L1V1_1187008882_3_806.xml"  # or H1L1_...
 
 xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(coinc_xml)

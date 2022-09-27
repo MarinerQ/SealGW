@@ -13,11 +13,12 @@ import spiir  # quite slow to import?
 
 
 if __name__ == "__main__":
-    print('\nProcessing .xml file...')
 
     #data_dir = Path("data/coinc_xml/")
     data_dir = Path("/fred/oz016/qian/test/")
     coinc_xml = data_dir / "H1L1V1_1187008882_3_806.xml"  # or H1L1_...
+    
+    print(f'Processing coinc.xml file from {coinc_xml}...')
 
     xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(coinc_xml)
 
@@ -61,11 +62,11 @@ if __name__ == "__main__":
     # Save SNR
     for det in det_names:
         snr_to_save = np.array([timestamp, np.real(snr_timeseries_dict[det]), 1*np.imag(snr_timeseries_dict[det])]).T 
-        np.savetxt('data/snr_data/snr_det{}'.format(lal_det_code[det]), snr_to_save)
+        np.savetxt(f'data/snr_data/snr_det{lal_det_code[det]}', snr_to_save)
 
 
-    print('Trigger time: ',trigger_time)
-    print('Detectors: ', det_names)
-    print('SNRs: ', max_snr_array)
-    print("sigmas: ", sigma_array)
+    print(f'Trigger time: {trigger_time}')
+    print(f'Detectors: {det_names}')
+    print(f'SNRs: {max_snr_array}')
+    print(f'sigmas: {sigma_array}')
     print('SNR and event info have been saved. \n')

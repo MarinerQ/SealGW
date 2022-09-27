@@ -22,7 +22,13 @@ if __name__ == "__main__":
 
     xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(coinc_xml)
 
-    det_names = list(xmlfile['snrs'].keys())
+    try:
+        det_names = list(xmlfile['snrs'].keys())
+    except KeyError as err:
+        raise KeyError(
+            f"snr array data not present {coinc_xml} file. Please check your coinc.xml!"
+        ) from err
+    
     ndet = len(det_names)
 
     # Calculate sigma = sqrt((h|h)) = deff/SNR

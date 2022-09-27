@@ -6,27 +6,22 @@
 
 # The process may be faster if we do the above in C code. 
 
-from pathlib import Path
-import pandas as pd
+import click
 import numpy as np
 import spiir  # quite slow to import?
 
 
-if __name__ == "__main__":
-
-    #data_dir = Path("data/coinc_xml/")
-    data_dir = Path("/fred/oz016/qian/test/")
-    coinc_xml = data_dir / "H1L1V1_1187008882_3_806.xml"  # or H1L1_...
-    
-    print(f'Processing coinc.xml file from {coinc_xml}...')
-
-    xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(coinc_xml)
+@click.command
+@click.argument("path", type=str, default="/fred/oz016/qian/test/H1L1V1_1187008882_3_806.xml")
+def main(path: str):
+    print(f'Processing coinc.xml file from {path}...')
+    xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(path)
 
     try:
         det_names = list(xmlfile['snrs'].keys())
     except KeyError as err:
         raise KeyError(
-            f"snr array data not present {coinc_xml} file. Please check your coinc.xml!"
+            f"snr array data not present {path} file. Please check your coinc.xml!"
         ) from err
     
     ndet = len(det_names)
@@ -76,3 +71,6 @@ if __name__ == "__main__":
     print(f'SNRs: {max_snr_array}')
     print(f'sigmas: {sigma_array}')
     print('SNR and event info have been saved. \n')
+
+if __name__ == "__main__":
+    main()

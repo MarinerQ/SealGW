@@ -26,5 +26,5 @@
 #export LD_LIBRARY_PATH=$CUDA_PATH/lib64:$LD_LIBRARY_PATH
 
 #source /home/chichi/.lalsuiterc
-
+#module load lalsuite/6.49.0
 module load gcc/8.2.0 openmpi/4.0.0 lalsuite/6.49.0 openblas/0.2.20 gsl/2.5 fftw/3.3.8

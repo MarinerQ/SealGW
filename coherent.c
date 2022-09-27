@@ -135,6 +135,55 @@ time_series* readsnr2time_series(char *filename)
 	return timeseries;
 }
 
+/*
+COMPLEX8TimeSeries* read2Complex8TimeSeries(char *filename, char *detname){
+	int i=0;
+	int npoint;
+	double gps_time,deltaT;
+
+	//read data from txt
+	FILE *ft_r = fopen(filename,"r");
+	if(ft_r==NULL){
+		printf("can not found the file\n");
+		exit(-1);
+	}
+	
+	npoint=0;
+	double time,data_real,data_imag;
+	while(fscanf(ft_r,"%lf %lf %lf",&time,&data_real,&data_imag)!=EOF){
+		//printf("%e %e %e\n",time,data_real,data_imag);
+		npoint++;
+	}
+	fclose(ft_r);
+
+	FILE *fp_r = fopen(filename,"r");
+
+	double complex *data = (double complex*)malloc(sizeof(double complex)*npoint);
+	while(fscanf(fp_r,"%lf %lf %lf",&time,&data_real,&data_imag)!=EOF){
+		data[i] = data_real + data_imag*I;
+		//printf("%e \n",data[i]);
+		if(i==0) gps_time=time; 
+		if(i==1) deltaT=time-gps_time;
+		i++;
+	}
+	fclose(fp_r);
+
+	time_series *timeseries = create_time_series(npoint,gps_time,deltaT,NULL);
+
+	for(i=0;i<npoint;i++){
+		timeseries->data[i] = data[i];
+	}
+
+
+
+	LIGOTimeGPS gps_time_ligo;
+	gps_time_ligo.gpsSeconds = (int)gps_time;
+	gps_time_ligo.gpsNanoSeconds = (int)(gps_time-(int)gps_time)*1000000000;
+
+	comp8ts = XLALCreateCOMPLEX8TimeSeries(detname, const LIGOTimeGPS *epoch, 0, REAL8 deltaT, const LALUnit *sampleUnits, size_t length)
+}
+*/
+
 void read_skygrids(char *filename, double *ra, double *dec)
 {
 	printf("txt file from    : %s \n",filename);
@@ -186,6 +235,26 @@ void read_sigma(char *filename, double *sigma)
 
 	printf("\nnpoint  = %d  \n",npoint);
 	printf("---------------------------------------\n");
+}
+
+void read_event_info(char *filename, double *event_info)
+{
+	int npoint;
+
+	//read data from txt
+	FILE *ft_r = fopen(filename,"r");
+	if(ft_r==NULL){
+		printf("Can not find event info file!\n");
+		exit(-1);
+	}
+	
+	npoint=0;
+	double info_temp;
+	while(fscanf(ft_r,"%lf",&info_temp)!=EOF){
+		event_info[npoint]  = info_temp;
+		npoint++;
+	}
+	fclose(ft_r);
 }
 
 void create_healpix_skygrids_from_file(int nside, double *ra_grids, double *dec_grids)

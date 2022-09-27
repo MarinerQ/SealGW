@@ -12,7 +12,7 @@ import spiir  # quite slow to import?
 
 
 @click.command
-@click.argument("path", type=str, default="/fred/oz016/qian/test/H1L1V1_1187008882_3_806.xml")
+@click.argument("path", type=str) # default="/fred/oz016/qian/test/H1L1V1_1187008882_3_806.xml")
 def main(path: str):
     print(f'Processing coinc.xml file from {path}...')
     xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(path)

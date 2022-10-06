@@ -147,7 +147,8 @@ def f(x,mu,sigma):
 def initial_estimate(snr):
     # design noise
     mu = 0.00029915*snr - 0.0001853
-    sigma = 0.0001759*snr + 3.75904e-05
+    #sigma = 0.0001759*snr + 3.75904e-05
+    sigma = mu/np.sqrt(2.71828*np.log(2))
 
     return mu, sigma
 
@@ -168,10 +169,7 @@ def bins_to_center_values(bins):
     return center_values
 
 def ls_fit_bi(snr,samples):  # fit 2 Gaussian prior
-    if snr>18:
-        n,bins,patches = plt.hist(samples,bins=15,density=True)
-    else:
-        n,bins,patches = plt.hist(samples,bins='auto',density=True)
+    n,bins,patches = plt.hist(samples,bins='auto',density=True)
     x = bins_to_center_values(bins)
     mu_init, sigma_init = initial_estimate(snr)
     paras0=[mu_init,sigma_init]
@@ -205,7 +203,7 @@ def calculate_snr_kernel(sample_ID, samples, ifos, wave_gen, results):
 if __name__ == '__main__':
     time_start = time.time()
     
-    # python musigma_fitting.py 100 LHV BNS 170817 4
+    # python musigma_fitting.py 30000 LHV BNS 170817 4
     Nsample = int(sys.argv[1])  # e.g. 50000
     det_flag = str(sys.argv[2])  # e.g. LHVK
     source_type = str(sys.argv[3])  # e.g. BNS
@@ -217,7 +215,7 @@ if __name__ == '__main__':
     print("Generating parameters...")
     # generate samples
     if source_type == 'BNS':
-        samples = generate_random_inject_paras(Nsample=Nsample,dmin = 0, dmax=80,m1_low=1.1,m1_high=2, q_low = 0.8, a_max=0.1, m2_low=1.1)
+        samples = generate_random_inject_paras(Nsample=Nsample,dmin = 0, dmax=200,m1_low=1.1,m1_high=2, q_low = 0.8, a_max=0.1, m2_low=1.1)
     elif source_type == 'BBH':
         samples = generate_random_inject_paras(Nsample=Nsample,dmin = 0, dmax=4000,m1_low=6,m1_high=90, q_low = 0.25, a_max=0.1, m2_low=6)
     elif source_type == 'NSBH':
@@ -348,7 +346,7 @@ if __name__ == '__main__':
     plt.figure(figsize=(10,7.5))
     plt.rcParams.update({"font.size":16})
 
-    plt.text(7.8, 9.5, r'x 10$^{-3}$',fontsize=16)
+    #plt.text(7.8, 9.5, r'x 10$^{-3}$',fontsize=16)
     plt.yticks(size = ticksize)
     plt.xticks(size = ticksize)
     plt.scatter(snr_steps, 1e3*np.array(mu_list),marker='x',color='orangered',label=r"$\mu$")
@@ -356,7 +354,7 @@ if __name__ == '__main__':
     plt.scatter(snr_steps, 1e3*np.array(sigma_list),marker='o',color='darkorange',label=r"$\sigma$")
     plt.plot(snr_steps,1e3*(c*snr_steps+d),color='forestgreen',label=r"Linear fitting of $\sigma$")
     plt.xlabel("Signal-to-noise Ratio",size = labelsize)
-    plt.ylabel(r'$\mu$ and $\sigma$',size = labelsize)
+    plt.ylabel(r'$\mu, \sigma \times$ 1000',size = labelsize)
     plt.legend(loc = 'best',ncol=2, fontsize=legendsize)
     plt.grid()
 
@@ -388,6 +386,7 @@ if __name__ == '__main__':
         plt.hist(select_aij_according_to_snr(result, snr_low, snr_high),bins='auto',density=True, label='SNR {}-{}'.format(snr_low,snr_high),color=color_bar)
         plt.plot(A_range,theo_pdf,color=color_line)
         plt.ylabel('Probability density',size=labelsize)
+        plt.xlim(-0.05,0.05)
         plt.legend()
 
     plt.savefig('data/psd/{}/bimodal_fit_{}_{}.pdf'.format(psd_label, source_type, det_flag))

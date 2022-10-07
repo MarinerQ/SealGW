@@ -27,7 +27,7 @@ OBJS	= coherent.o generate_signal.o filter.o statistic.o
 OBJSDIR = object
 
 # define the executable file
-MAIN	= exe_170817
+MAIN	= exe_loc
 
 all: $(MAIN)
 

@@ -247,7 +247,7 @@ if __name__ == '__main__':
         det = ifos[i]
         det.duration = duration
         det.sampling_frequency=sampling_frequency
-        psd_file = 'data/psd/{}/{}_psd.txt'.format(psd_label, det_name_list[i])
+        psd_file = 'psd/{}/{}_psd.txt'.format(psd_label, det_name_list[i])
         psd = power_spectral_density = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
         det.power_spectral_density = psd 
     
@@ -309,7 +309,7 @@ if __name__ == '__main__':
     A22 = ( -(1+cos_iota*cos_iota)/2*sin_phic*sin_2psi + cos_iota*cos_phic*cos_2psi ) / d_L
 
     result = np.vstack([snrs, A11, A12, A21, A22]).T
-    np.savetxt('data/psd/{}/snr_A_{}_{}.txt'.format(psd_label, source_type, det_flag), result)
+    np.savetxt('psd/{}/snr_A_{}_{}.txt'.format(psd_label, source_type, det_flag), result)
 
 
     #snr_steps = [0,8,10,12,14,16,18,20,22,24,26,28,30,32,114514]
@@ -334,7 +334,7 @@ if __name__ == '__main__':
 
     a,b = np.polyfit(snr_steps,mu_list,1)
     c,d = np.polyfit(snr_steps,sigma_list,1)
-    np.savetxt('data/psd/{}/abcd_{}_{}.txt'.format(psd_label, source_type, det_flag), [a,b,c,d])
+    np.savetxt('psd/{}/abcd_{}_{}.txt'.format(psd_label, source_type, det_flag), [a,b,c,d])
 
 
     # test plots
@@ -358,7 +358,7 @@ if __name__ == '__main__':
     plt.legend(loc = 'best',ncol=2, fontsize=legendsize)
     plt.grid()
 
-    plt.savefig('data/psd/{}/linear_fit_{}_{}.pdf'.format(psd_label, source_type, det_flag))
+    plt.savefig('psd/{}/linear_fit_{}_{}.pdf'.format(psd_label, source_type, det_flag))
     ####### end of linear fitting #######
     ####### bimodal fitting #######
 
@@ -389,7 +389,7 @@ if __name__ == '__main__':
         plt.xlim(-0.05,0.05)
         plt.legend()
 
-    plt.savefig('data/psd/{}/bimodal_fit_{}_{}.pdf'.format(psd_label, source_type, det_flag))
+    plt.savefig('psd/{}/bimodal_fit_{}_{}.pdf'.format(psd_label, source_type, det_flag))
     ####### end of bimodal fitting #######
 
 

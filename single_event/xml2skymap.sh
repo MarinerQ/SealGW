@@ -11,7 +11,7 @@ mkdir skymap
 
 make clean
 make
-./exe_170817
+./exe_loc
 
 # plot skymap
 #source bashrc_py
@@ -20,4 +20,4 @@ python plot_skymap.py
 
 
 # delete large files that can not be uploaded to github
-rm -r skymap sky_grids
+#rm -r skymap sky_grids

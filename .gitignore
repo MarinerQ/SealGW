@@ -129,3 +129,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# outputs
+data/psd/abcd*
+data/psd/*.pdf 
+*.pdf 
+sky_grids/
+skymap/

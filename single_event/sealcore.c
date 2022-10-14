@@ -270,6 +270,11 @@ static void getGsigma_matrix(const LALDetector *detectors,const double *sigma, i
 
 
 
+double testfunc1(double a, double b){
+	return a*b;
+}
+
+
 /*
 Coherent localization skymap with bimodal correlated-digonal prior. 
 See arXiv:2110.01874.

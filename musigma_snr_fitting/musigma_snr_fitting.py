@@ -203,7 +203,7 @@ def calculate_snr_kernel(sample_ID, samples, ifos, wave_gen, results):
 if __name__ == '__main__':
     time_start = time.time()
     
-    # python musigma_fitting.py 30000 LHV BNS 170817 4
+    # python musigma_snr_fitting.py 30000 LHV BNS 170817 4
     Nsample = int(sys.argv[1])  # e.g. 50000
     det_flag = str(sys.argv[2])  # e.g. LHVK
     source_type = str(sys.argv[3])  # e.g. BNS

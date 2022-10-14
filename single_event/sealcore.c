@@ -6,16 +6,41 @@
 #include <string.h>
 #include <time.h>
 
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_vector.h>
-#include <gsl/gsl_linalg.h>
+#include </apps/skylake/software/compiler/gcc/6.4.0/gsl/2.4/include/gsl/gsl_matrix.h>
+#include </apps/skylake/software/compiler/gcc/6.4.0/gsl/2.4/include/gsl/gsl_vector.h>
+#include </apps/skylake/software/compiler/gcc/6.4.0/gsl/2.4/include/gsl/gsl_linalg.h>
 
-#include <lal/LALDetectors.h>
-#include <lal/LALSimulation.h>
-#include <lal/TimeDelay.h>
-#include <lal/LALDatatypes.h>
+#include </fred/oz016/opt-pipe/include/lal/LALDetectors.h>
+#include </fred/oz016/opt-pipe/include/lal/LALSimulation.h>
+#include </fred/oz016/opt-pipe/include/lal/TimeDelay.h>
+#include </fred/oz016/opt-pipe/include/lal/LALDatatypes.h>
 
-#include <coherent.h>
+//#include <include/coherent.h>
+
+
+typedef struct tagTimeSeries{
+	int npoint;
+	double start_time;
+	double delta_t;
+	double complex *data;
+} time_series;
+
+typedef struct tagTimeSeries2{
+	int npoint;
+	double start_time;
+	double delta_t;
+	double complex *data;
+} time_series2;
+
+typedef struct tagDataStreams{
+	int Nstream;
+	time_series **streams;
+} data_streams;
+
+typedef struct tagDataStreams2{
+	int Nstream;
+	COMPLEX8TimeSeries **streams;
+} data_streams2;
 
 
 
@@ -25,6 +50,18 @@ static double max_in_4(double loga, double logb, double logc, double logd){
 	if(temp<logc) temp = logc;
 	if(temp<logd) temp = logd;
 	return temp;
+}
+
+static double logsumexp(double loga, double logb)
+{
+	if(loga>logb){
+		if(loga>logb+40) return loga;
+		else return loga + log(1+exp(logb-loga));
+	}
+	else{
+		if(logb>loga+40) return logb;
+		else return logb + log(1+exp(loga-logb));
+	}
 }
 
 static double logsumexp4(double loga, double logb, double logc, double logd)
@@ -296,7 +333,7 @@ double *coherent_skymap_bicorr(
 
 	int grid_id,time_id,det_id;
 	int Ndet = strain_data->Nstream;
-	double Gsigma[2*Ndet]  //,singular[2];
+	double Gsigma[2*Ndet];  //,singular[2];
 	double dt = (end_time-start_time)/ntime;
 	double ref_gps_time = (start_time + end_time)/2.0;
 
@@ -529,7 +566,7 @@ double *coherent_skymap_bicorr(
 		coh_skymap_bicorr[grid_id] = log_prob_margT_bicorr;
 	}
 
-	free(cohfactor);
+	//free(cohfactor);
 	//gsl_matrix_free(Utrans);
 	gsl_matrix_free(detector_real_streams);
 	gsl_matrix_free(detector_imag_streams);

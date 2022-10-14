@@ -6,22 +6,30 @@
 
 # The process may be faster if we do the above in C code. 
 
+from pathlib import Path
+
 import click
 import numpy as np
 import spiir  # quite slow to import?
 
 
 @click.command
-@click.argument("path", type=str) # default="/fred/oz016/qian/test/H1L1V1_1187008882_3_806.xml")
-def main(path: str):
-    print(f'Processing coinc.xml file from {path}...')
-    xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(path)
+@click.argument("xml", type=str) # default="data/coinc_xml/H1L1V1_1187008882_3_806.xml"
+@click.option("--out", type=str, default="data", help="Output data directory")
+def main(xml: str, out: str = "data"):
+    print(f'Processing coinc.xml file from {xml}...')
+    xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(xml)
+    
+    # specify folder to save output data
+    out_path = Path(out)
+    out_path.mkdir(exist_ok=True, parents=True)
+    (out_path / "snr_data").mkdir(exist_ok=True)  # make output subfolder for SNR data
 
     try:
         det_names = list(xmlfile['snrs'].keys())
     except KeyError as err:
         raise KeyError(
-            f"snr array data not present {path} file. Please check your coinc.xml!"
+            f"snr array data not present {xml} file. Please check your coinc.xml!"
         ) from err
     
     ndet = len(det_names)
@@ -34,12 +42,16 @@ def main(path: str):
         max_snr_array = np.append(max_snr_array, xmlfile['tables']['postcoh']['snglsnr_'+det])
     sigma_array = deff_array*max_snr_array
 
+    trigger_time = xmlfile["tables"]["postcoh"]["end_time"].item()
+    trigger_time += xmlfile["tables"]["postcoh"]["end_time_ns"].item() * 1e-9
 
-    # Is trigger time stored in xml file? 
-    timestamp = xmlfile['snrs'][det].index.to_numpy()
-    snr_timeseries_dict = xmlfile['snrs']
-    netsnr_timeseries = sum([abs(snr_timeseries_dict[det]) ** 2 for det in det_names])
-    trigger_time = timestamp[np.argmax(netsnr_timeseries)]
+    # Is trigger time stored in xml file?
+    timestamps = {det: xmlfile["snrs"][det].index.values for det in det_names}
+    # timestamp = xmlfile['snrs'][det].index.to_numpy()
+    # snr_timeseries_dict = xmlfile['snrs']
+    # netsnr_timeseries = sum([abs(snr_timeseries_dict[det]) ** 2 for det in det_names])
+    
+    # trigger_time = timestamp[np.argmax(netsnr_timeseries)]
     #trigger_time = timestamp[np.argmax(abs(snr_timeseries_dict['L1']))]
 
     # Save event info
@@ -57,13 +69,13 @@ def main(path: str):
         event_info = np.append(event_info, lal_det_code[det])
     event_info = np.append(event_info, max_snr_array)
     event_info = np.append(event_info, sigma_array)
-    np.savetxt('data/event_info', event_info)
+    np.savetxt(out_path / 'event_info', event_info)
 
 
     # Save SNR
     for det in det_names:
-        snr_to_save = np.array([timestamp, np.real(snr_timeseries_dict[det]), 1*np.imag(snr_timeseries_dict[det])]).T 
-        np.savetxt(f'data/snr_data/snr_det{lal_det_code[det]}', snr_to_save)
+        snr_to_save = np.array([timestamps[det], np.real(xmlfile['snrs'][det]), 1*np.imag(xmlfile['snrs'][det])]).T 
+        np.savetxt(out_path / "snr_data" / f"snr_det{lal_det_code[det]}", snr_to_save)
 
 
     print(f'Trigger time: {trigger_time}')

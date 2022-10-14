@@ -12,5 +12,6 @@ from astropy.coordinates import SkyCoord
 
 if __name__ == "__main__":
 
-    with open('deta/event_info') as f:
-        event_info = f.readlines()
+    event_info = np.loadtxt('data/event_info')
+
+    

@@ -12,19 +12,29 @@ Fit the $\mu,\sigma$-SNR relation, and get the linear coefficients for prior set
 
 2. Run the python script: python musigma_snr_fitting.py [Number_of_Injections] [Network_Name] [Source_Type] [YOUR_PSD_LABEL] [Number_of_CPUs].
 
-Number_of_Injections: I recommend >30000 for a good fitting.
+[Number_of_Injections]: I recommend >30000 for a good fitting.
 
-Network_Name: should be a combination of letters "H", "L", "V", "K", "I", "C", "E". For O3, it should be "LHV". For O4, it should be "LHVK".
+[Network_Name]: should be a combination of letters "H", "L", "V", "K", "I", "C", "E". For O3, it should be "LHV". For O4, it should be "LHVK".
 
-Source_Type: BNS or BBH
+[Source_Type]: BNS or BBH
 
-YOUR_PSD_LABEL: as mentioned before. Can be "O4", "O3", ...
+[YOUR_PSD_LABEL]: as mentioned before. Can be "O4", "O3", ... In the example we use "170817".
 
-Number_of_CPUs: e.g., 4.
+[Number_of_CPUs]: e.g., 4.
 
-Then we can run it like: <tt> python musigma_snr_fitting.py 30000 LHV BNS 170817 4 </tt>
+Then we can run it like: <tt> python musigma_snr_fitting.py 30000 LHV BNS 170817 4 </tt>. It takes roughly 3 mins on my Macbook (2.3 GHz 8-Core Intel Core i9).
 
 3. The code will produce 4 output files. <tt> psd/{YOUR_PSD_LABEL}/snr_A_xxx.txt </tt> saves SNR and Aijs, <tt>psd/{YOUR_PSD_LABEL}/abcd_xxx.txt </tt> saves linear coefficients. It has 4 elements, say, a,b,c,d. Then you will have $\mu = a\textrm{SNR} + b,\sigma = c\textrm{SNR} + d$. And 2 figures, showing the linear fitting and bimodal fitting. 
 
+The a,b,c,d are what we need for localization.
+
+
+### single_event/
+
+Localization for a single event. Under development. 
 
 ## TODO
+
+* Catalog test and pp plot
+
+* Early warning development.

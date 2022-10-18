@@ -145,6 +145,8 @@ double max_coherent_snr(const double *coh_skymap, int npix)
 	return a_max;
 }
 
+int gsl_sort_vector_index(gsl_permutation *p, const gsl_vector *v);
+
 // calculate the area of certain confident level
 double exp_cumulative_skyarea(const double *coh_skymap, int nside, double ratio)
 {

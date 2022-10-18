@@ -7,11 +7,12 @@ from matplotlib import pyplot as plt
 #from ligo.skymap import postprocess
 #from astropy import units as u
 #from astropy.coordinates import SkyCoord
-from ctypes import *
+#from ctypes import *
 import os
 #os.environ['LD_LIBRARY_PATH'] = '/apps/skylake/software/compiler/gcc/6.4.0/gsl/2.4/lib'
 #os.environ['LD_LIBRARY_PATH'] = '/fred/oz016/opt-pipe/lib' 
 import sealcore
+#import test1
 #export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/fred/oz016/opt-pipe/lib
 
 
@@ -22,4 +23,4 @@ if __name__ == "__main__":
     #so_file = "sealcore.so"
     #sealcore = CDLL(so_file)
     #sealcore = cdll.LoadLibrary(os.path.abspath(so_file))
-    print(sealcore.testfunc1(3,8))
+    print(sealcore.pytest1(3,8))

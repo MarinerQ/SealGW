@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <complex.h>
-#include <omp.h>
+//#include <omp.h>
 #include <string.h>
 #include <time.h>
 
@@ -14,6 +14,7 @@
 #include <lal/LALSimulation.h>
 #include <lal/TimeDelay.h>
 #include <lal/LALDatatypes.h>
+#include <lal/Date.h>
 
 #include <coherent.h>
 

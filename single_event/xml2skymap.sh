@@ -1,5 +1,5 @@
 # process xml file to txt
-module load python/3.10.4
+module load python/3.10.4 gsl/2.5
 source /fred/oz016/qian/spiirenv/bin/activate
 python process_xml.py 
 

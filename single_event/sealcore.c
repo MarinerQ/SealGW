@@ -6,16 +6,17 @@
 #include <string.h>
 #include <time.h>
 
-#include </apps/skylake/software/compiler/gcc/6.4.0/gsl/2.4/include/gsl/gsl_matrix.h>
-#include </apps/skylake/software/compiler/gcc/6.4.0/gsl/2.4/include/gsl/gsl_vector.h>
-#include </apps/skylake/software/compiler/gcc/6.4.0/gsl/2.4/include/gsl/gsl_linalg.h>
+#include <gsl/gsl_matrix.h> // /apps/skylake/software/compiler/gcc/6.4.0/gsl/2.4/include/
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_linalg.h>
 
-#include </fred/oz016/opt-pipe/include/lal/LALDetectors.h>
-#include </fred/oz016/opt-pipe/include/lal/LALSimulation.h>
-#include </fred/oz016/opt-pipe/include/lal/TimeDelay.h>
-#include </fred/oz016/opt-pipe/include/lal/LALDatatypes.h>
+#include <lal/LALDetectors.h> // /fred/oz016/opt-pipe/include/
+#include <lal/LALSimulation.h>
+#include <lal/TimeDelay.h>
+#include <lal/LALDatatypes.h>
 
 //#include <include/coherent.h>
+//cc -fPIC -shared -o sealcore.so sealcore.c -llal -lgsl
 
 
 typedef struct tagTimeSeries{

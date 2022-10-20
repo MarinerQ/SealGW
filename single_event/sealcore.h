@@ -17,6 +17,7 @@
 #include <lal/Date.h>
 #include <lal/Units.h>
 
+#include <Python.h>
 //#include <include/coherent.h>
 //cc -fPIC -shared -o sealcore.so sealcore.c -llal -lgsl
 
@@ -321,7 +322,8 @@ COMPLEX8TimeSeries ** makeCOMPLEX8TimeSeries(double **data_array, int ndet){
 
 
 
-void testLALseries(COMPLEX8TimeSeries **snr_series, int ndet){
+//void testLALseries(COMPLEX8TimeSeries **snr_series, int ndet){
+/*void testLALseries(PyObject **snr_series, int ndet){
 	int i, j;
 	double max_snr, temp_snr;
 	COMPLEX8TimeSeries *c8ts;
@@ -338,7 +340,7 @@ void testLALseries(COMPLEX8TimeSeries **snr_series, int ndet){
 		max_snr = 0;
 		for (j = 0; j < len; j++)
 		{
-			temp_snr = abs(snr[j]);
+			temp_snr = cabsf(snr[j]);
 			if (temp_snr>max_snr)
 			{
 				max_snr=temp_snr;
@@ -346,7 +348,36 @@ void testLALseries(COMPLEX8TimeSeries **snr_series, int ndet){
 		}
 		printf("%c, %f\n", name, max_snr);
 	}
+}*/
+void testdoubleseries(double *data_array, int ndet, int ntime){
+	// data_array: 3*ndet*ntimes 1-D array. [ [time1], [real1], [imag1], [time2], ... ]
+	// i: det index, j: time index
+	// time_ij: 3*ntime*i + j = 3i*ntime + j
+	// real_ij: 3*ntime*i + ntime + j = (3i+1)*ntime + j
+	// imag_ij: 3*ntime*i + 2*ntime + j = (3i+2)*ntime + j
+	int i, j;
+	double max_snr, temp_snr,temp_r,temp_i;
+	double *c8ts;
+	//char name;
+	double complex *snr;
+	for ( i = 0; i < ndet; i++)
+	{
+		max_snr = 0;
+		for (j = 0; j < ntime; j++)
+		{
+			temp_r = data_array[(3*i+1)*ntime + j];
+			temp_i = data_array[(3*i+2)*ntime + j];
+			temp_snr = sqrt(temp_r*temp_r + temp_i*temp_i);
+			if (temp_snr>max_snr)
+			{
+				max_snr=temp_snr;
+			}
+		}
+		//printf("%c, %f\n", name, max_snr);
+		printf("det%d, %f\n", i, max_snr);
+	}
 }
+
 
 /*
 Coherent localization skymap with bimodal correlated-digonal prior. 

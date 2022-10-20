@@ -63,7 +63,8 @@ def main(xml: str, out: str = "data"):
     # /fred/oz016/opt-pipe/include/lal/LALDetectors.h
     # Be careful when chenge to new version - the code is different, see:
     # https://lscsoft.docs.ligo.org/lalsuite/lal/_l_a_l_detectors_8h_source.html#l00168
-    lal_det_code = {'L1': 5, 'H1': 4, 'V1':1, 'K1': 16, 'I1': 17}  
+    #lal_det_code = {'L1': 5, 'H1': 4, 'V1':1, 'K1': 16, 'I1': 17}  # old lal
+    lal_det_code = {'L1': 6, 'H1': 5, 'V1':2, 'K1': 14, 'I1': 15}  # new lal
     det_code_array = np.array([])
     for det in det_names:
         event_info = np.append(event_info, lal_det_code[det])

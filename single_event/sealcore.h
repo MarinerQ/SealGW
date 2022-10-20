@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <complex.h>
-#include <omp.h>
+//#include <omp.h>
 #include <string.h>
 #include <time.h>
 
@@ -14,6 +14,8 @@
 #include <lal/LALSimulation.h>
 #include <lal/TimeDelay.h>
 #include <lal/LALDatatypes.h>
+#include <lal/Date.h>
+#include <lal/Units.h>
 
 //#include <include/coherent.h>
 //cc -fPIC -shared -o sealcore.so sealcore.c -llal -lgsl
@@ -312,6 +314,39 @@ double testfunc1(double a, double b){
 	return a*b;
 }
 
+/*
+COMPLEX8TimeSeries ** makeCOMPLEX8TimeSeries(double **data_array, int ndet){
+	
+}*/
+
+
+
+void testLALseries(COMPLEX8TimeSeries **snr_series, int ndet){
+	int i, j;
+	double max_snr, temp_snr;
+	COMPLEX8TimeSeries *c8ts;
+	CHAR name;
+	UINT4 len;
+	COMPLEX8 *snr;
+	for ( i = 0; i < ndet; i++)
+	{
+		c8ts = snr_series[i];
+		name = c8ts->name;
+		len = c8ts->data->length;
+		snr = c8ts->data->data;
+		
+		max_snr = 0;
+		for (j = 0; j < len; j++)
+		{
+			temp_snr = abs(snr[j]);
+			if (temp_snr>max_snr)
+			{
+				max_snr=temp_snr;
+			}
+		}
+		printf("%c, %f\n", name, max_snr);
+	}
+}
 
 /*
 Coherent localization skymap with bimodal correlated-digonal prior. 
@@ -319,7 +354,7 @@ See arXiv:2110.01874.
 */
 double *coherent_skymap_bicorr(
 				const data_streams *strain_data, 
-				const LALDetector *detectors, 
+				const int *detector_codes, 
 				const double *sigma, 
 				const double *ra_grids, 
 				const double *dec_grids, 
@@ -334,23 +369,23 @@ double *coherent_skymap_bicorr(
 
 	int grid_id,time_id,det_id;
 	int Ndet = strain_data->Nstream;
-	double Gsigma[2*Ndet];  //,singular[2];
+	double Gsigma[2*Ndet];  
 	double dt = (end_time-start_time)/ntime;
 	double ref_gps_time = (start_time + end_time)/2.0;
 
-	//get the U matrix skymap first
-	//double *cohfactor = coherent_snr_combination_factors_skymap(detectors,sigma,Ndet,ra_grids,dec_grids,ngrid,ref_gps_time);
-	//double *Gsigma_temp[Ndet*2];
+	LALDetector tempdet, detectors[Ndet];
+	for(det_id=0; det_id<Ndet; det_id++){
+		tempdet = lalCachedDetectors[detector_codes[det_id]];
+		detectors[det_id] = tempdet;
+	}
+
 	double *coh_skymap_bicorr = (double*)malloc(sizeof(double)*ngrid);
 	printf("ngrid  = %d  \n",ngrid);
 	printf("ntime  = %d  \n",ntime);
 	printf("ndet   = %d  \n",Ndet);
 
-	//gsl_matrix *Utrans = gsl_matrix_alloc(Ndet,2);
 	gsl_matrix *detector_real_streams = gsl_matrix_calloc(ntime,Ndet);
 	gsl_matrix *detector_imag_streams = gsl_matrix_calloc(ntime,Ndet);
-	//gsl_matrix *signal_real_streams   = gsl_matrix_calloc(ntime,2);
-	//gsl_matrix *signal_imag_streams   = gsl_matrix_calloc(ntime,2);
 
 	gsl_matrix *M_prime = gsl_matrix_alloc(2,2);
 
@@ -360,9 +395,6 @@ double *coherent_skymap_bicorr(
 	gsl_matrix *J_real_streams   = gsl_matrix_calloc(ntime,2);
 	gsl_matrix *J_imag_streams   = gsl_matrix_calloc(ntime,2);
 
-	//gsl_vector *null_stream = gsl_vector_calloc(ntime);
-	//gsl_matrix *I_dagger    = gsl_matrix_calloc(Ndet,Ndet);
-	//gsl_vector_set_zero(null_stream);
 
 	LIGOTimeGPS ligo_gps_time;
 	ligo_gps_time.gpsSeconds = (int)(ref_gps_time);
@@ -379,12 +411,6 @@ double *coherent_skymap_bicorr(
 		double ra  = ra_grids[grid_id];
 		double dec = dec_grids[grid_id];
 
-		//get transform matrix
-		//for(det_id=0;det_id<Ndet;det_id++){
-		//	gsl_matrix_set(Utrans,det_id,0,cohfactor[grid_id*Ndet*2+det_id*2+0]);
-		//	gsl_matrix_set(Utrans,det_id,1,cohfactor[grid_id*Ndet*2+det_id*2+1]);
-		//}
-
 
 		//time shift the data
 		for(det_id=0;det_id<Ndet;det_id++){
@@ -398,39 +424,7 @@ double *coherent_skymap_bicorr(
 			}
 		}
 		
-		
-
-
-		//transform from matched filter data to signal stream
-        /*
-		for(time_id=0;time_id<ntime;time_id++){
-			double temp0_real=0;
-			double temp0_imag=0;
-			double temp1_real=0;
-			double temp1_imag=0;
-			for(det_id=0;det_id<Ndet;det_id++){
-				temp0_real += gsl_matrix_get(detector_real_streams,time_id,det_id)*gsl_matrix_get(Utrans,det_id,0);
-				temp0_imag += gsl_matrix_get(detector_imag_streams,time_id,det_id)*gsl_matrix_get(Utrans,det_id,0);
-				temp1_real += gsl_matrix_get(detector_real_streams,time_id,det_id)*gsl_matrix_get(Utrans,det_id,1);
-				temp1_imag += gsl_matrix_get(detector_imag_streams,time_id,det_id)*gsl_matrix_get(Utrans,det_id,1);
-			}
-			gsl_matrix_set(signal_real_streams,time_id,0,temp0_real);
-			gsl_matrix_set(signal_imag_streams,time_id,0,temp0_imag);
-			gsl_matrix_set(signal_real_streams,time_id,1,temp1_real);
-			gsl_matrix_set(signal_imag_streams,time_id,1,temp1_imag);
-		}*/
-
-		
-
-		//transform from strain data to null stream
-		/*if(Ndet>2){
-			calc_null_stream(detector_real_streams,detector_imag_streams,Utrans,I_dagger,null_stream);
-		}*/
-		
-		//calculate sigular value
 		getGsigma_matrix(detectors,sigma,Ndet,ra,dec,ref_gps_time,Gsigma);
-		//svd_Gsigma_get_singular_value(Gsigma,Ndet,NULL,singular);
-
 		//Calculate M
 		double temp_element;
 		int ii,jj;
@@ -457,8 +451,6 @@ double *coherent_skymap_bicorr(
 
         double M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22;
         double aa0 = gsl_matrix_get(M_prime,0,0) + gsl_matrix_get(M_prime,1,1) + xi;
-        //double bb0 = 0;
-        //double cc0 = 0;
         double dd0 = gsl_matrix_get(M_prime,1,1) + gsl_matrix_get(M_prime,0,0)+ xi;
         double detM0prime = aa0*dd0;
         M0_inverse_11 = 1.0/aa0;
@@ -486,7 +478,6 @@ double *coherent_skymap_bicorr(
 
 
 		//calculate skymap
-		//double signal0_real,signal0_imag,signal1_real,signal1_imag;
 		double snr_temp;
 		double log_exp_term1,log_exp_term2,log_exp_term,log_exp_term3,log_exp_term4;
 		double j_r1,j_r2,j_i1,j_i2;
@@ -495,20 +486,8 @@ double *coherent_skymap_bicorr(
 		double log_prob_margT_bicorr=-100;
 		double prefactor = log(detMprime);
 		double prefactor0 = log(detM0prime);
-		//coh_skymap_bicorr[grid_id+0*ngrid]=0;
-		//coh_skymap_bicorr[grid_id+1*ngrid]=0;
 		coh_skymap_bicorr[grid_id]=0;
 		for(time_id=0;time_id<ntime;time_id++){
-			//signal0_real = gsl_matrix_get(signal_real_streams,time_id,0);
-			//signal0_imag = gsl_matrix_get(signal_imag_streams,time_id,0);
-			//signal1_real = gsl_matrix_get(signal_real_streams,time_id,1);
-			//signal1_imag = gsl_matrix_get(signal_imag_streams,time_id,1);
-
-			//snr_temp = sqrt(signal0_real*signal0_real + signal0_imag*signal0_imag + 
-			//				signal1_real*signal1_real + signal1_imag*signal1_imag);
-
-			//snr_null_temp = snr_temp*snr_temp - gsl_vector_get(null_stream,time_id);
-			//snr_null_temp = sqrt(snr_null_temp);
 			j_r1 = gsl_matrix_get(J_real_streams,time_id,0);
 			j_r2 = gsl_matrix_get(J_real_streams,time_id,1);
 			j_i1 = gsl_matrix_get(J_imag_streams,time_id,0);
@@ -547,22 +526,7 @@ double *coherent_skymap_bicorr(
 			) - prefactor/2;
 			
 			log_exp_term = logsumexp4(log_exp_term1,log_exp_term2,log_exp_term3,log_exp_term4);
-			
-
-
-			//exp_term = (signal0_real*signal0_real + signal0_imag*signal0_imag)*factor0 + (signal1_real*signal1_real + signal1_imag*signal1_imag)*factor1;
-
-			//log_probability_bicorr = prefactor + 1.0/2.0*exp_term - gsl_vector_get(null_stream,time_id)/2.0;
-			log_probability_bicorr = log_exp_term;
-
-			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_probability_bicorr);
-
-			//if(snr_temp>coh_skymap_bicorr[grid_id+0*ngrid]){//find the maximum snr value accross the ntime
-			//	coh_skymap_bicorr[grid_id+0*ngrid] = snr_temp;
-			//}
-			/*if(snr_null_temp>coh_skymap_bicorr[grid_id+1*ngrid]){
-				coh_skymap_bicorr[grid_id+1*ngrid] = snr_null_temp;
-			}*/
+			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term);
 		}
 		coh_skymap_bicorr[grid_id] = log_prob_margT_bicorr;
 	}
@@ -571,9 +535,6 @@ double *coherent_skymap_bicorr(
 	//gsl_matrix_free(Utrans);
 	gsl_matrix_free(detector_real_streams);
 	gsl_matrix_free(detector_imag_streams);
-	//gsl_matrix_free(signal_real_streams);
-	//gsl_matrix_free(signal_imag_streams);
-	//gsl_matrix_free(I_dagger);
 
 	gsl_matrix_free(M_prime);
 	gsl_matrix_free(G_sigma);

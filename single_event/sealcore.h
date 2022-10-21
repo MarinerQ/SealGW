@@ -17,7 +17,12 @@
 #include <lal/Date.h>
 #include <lal/Units.h>
 
-#include <Python.h>
+COMPLEX16TimeSeries * 	XLALCreateCOMPLEX16TimeSeries (const CHAR *name, const LIGOTimeGPS *epoch, REAL8 f0, REAL8 deltaT, const LALUnit *sampleUnits, size_t length);
+
+void XLALDestroyCOMPLEX16TimeSeries (COMPLEX16TimeSeries *series);
+//#include <numpy/arrayobject.h>
+
+//#include <Python.h>
 //#include <include/coherent.h>
 //cc -fPIC -shared -o sealcore.so sealcore.c -llal -lgsl
 
@@ -43,7 +48,7 @@ typedef struct tagDataStreams{
 
 typedef struct tagDataStreams2{
 	int Nstream;
-	COMPLEX8TimeSeries **streams;
+	COMPLEX16TimeSeries **streams;
 } data_streams2;
 
 
@@ -88,7 +93,7 @@ static double logsumexp4(double loga, double logb, double logc, double logd)
 
 static void gsl_matrix_mult(const gsl_matrix *A, const gsl_matrix *B, gsl_matrix *C)
 {
-	int i,j,k;
+	unsigned long i,j,k;
 	double data=0;
 	
 	if(A->size2 != B->size1){
@@ -120,6 +125,80 @@ static double quadratic_form(double a1, double a2, double m11, double m12, doubl
 	return temp1+temp2+temp3;
 }
 
+double complex interpolate_time_series(COMPLEX16TimeSeries *lal_array, double time, int interp_order){
+	double start_time = lal_array->epoch.gpsSeconds + lal_array->epoch.gpsNanoSeconds*1E-9;
+	double end_time   = start_time + lal_array->data->length * lal_array->deltaT;
+	double deltat = lal_array->deltaT;
+
+	if(time < start_time){
+		printf("interpolate time < start time of time series!\n");
+		exit(-1);
+	}
+	else if(time > end_time){
+		printf("interpolate time > end time of time series!\n");
+		exit(-1);
+	}
+
+	int index = (int)((time-start_time)/deltat);
+	double diff = (time-start_time)/deltat-(double)index;
+	double complex int_data;
+	double real, imag;
+
+	if (interp_order==0)
+	{ // step interpolation
+		if(diff<0.5)
+		{
+			real = creal(lal_array->data->data[index]);
+			imag = cimag(lal_array->data->data[index]);
+			int_data = real+I*imag;
+	}
+		else
+		{
+			real = creal(lal_array->data->data[index+1]);
+			imag = cimag(lal_array->data->data[index+1]);
+			int_data = real+I*imag;
+		}
+	}
+	else if(interp_order == 1)
+	{ // linear interpolation
+		real = creal(lal_array->data->data[index])*(1-diff) + creal(lal_array->data->data[index+1])*diff;
+		imag = cimag(lal_array->data->data[index])*(1-diff) + cimag(lal_array->data->data[index+1])*diff;
+		int_data = real+I*imag;
+	}
+	else if(interp_order == 2) 
+	{ // quadratic interpolation
+		double complex y_1,y_2,y_3;
+		double x;
+		
+		if(diff<0.5)
+		{
+			x = diff;
+			y_1 = lal_array->data->data[index-1];
+			y_2 = lal_array->data->data[index];
+			y_3 = lal_array->data->data[index+1];
+		}
+		else
+		{
+			x = 1 - diff;
+			y_1 = lal_array->data->data[index];
+			y_2 = lal_array->data->data[index+1];
+			y_3 = lal_array->data->data[index+2];
+		}
+
+		real = creal(y_1)*x*(x-1.0)/(2.0) + creal(y_2)*(x+1.0)*(x-1.0)/(-1.0) + creal(y_3)*(x+1)*x/(2.0);
+		imag = cimag(y_1)*x*(x-1.0)/(2.0) + cimag(y_2)*(x+1.0)*(x-1.0)/(-1.0) + cimag(y_3)*(x+1)*x/(2.0);
+		int_data = real+I*imag;
+	}
+	else{
+		printf("Wrong interp order!\n");
+		exit(-1);
+	}
+	
+	return int_data;
+}
+
+
+/*
 static double complex step_interpolate_time_series(time_series* timeseries, double time)
 {
 	double start_time = timeseries->start_time;
@@ -155,6 +234,7 @@ static double complex step_interpolate_time_series(time_series* timeseries, doub
 
 	return int_data;
 }
+
 
 static double complex linear_interpolate_time_series(time_series* timeseries, double time)
 {
@@ -219,6 +299,7 @@ static double complex quadratic_interpolate_time_series(time_series* timeseries,
 
 	return int_data;
 }
+*/
 
 static void ComputeDetAMResponse(
 		double *fplus,          /**< Returned value of F+ */
@@ -316,39 +397,6 @@ double testfunc1(double a, double b){
 }
 
 /*
-COMPLEX8TimeSeries ** makeCOMPLEX8TimeSeries(double **data_array, int ndet){
-	
-}*/
-
-
-
-//void testLALseries(COMPLEX8TimeSeries **snr_series, int ndet){
-/*void testLALseries(PyObject **snr_series, int ndet){
-	int i, j;
-	double max_snr, temp_snr;
-	COMPLEX8TimeSeries *c8ts;
-	CHAR name;
-	UINT4 len;
-	COMPLEX8 *snr;
-	for ( i = 0; i < ndet; i++)
-	{
-		c8ts = snr_series[i];
-		name = c8ts->name;
-		len = c8ts->data->length;
-		snr = c8ts->data->data;
-		
-		max_snr = 0;
-		for (j = 0; j < len; j++)
-		{
-			temp_snr = cabsf(snr[j]);
-			if (temp_snr>max_snr)
-			{
-				max_snr=temp_snr;
-			}
-		}
-		printf("%c, %f\n", name, max_snr);
-	}
-}*/
 void testdoubleseries(double *data_array, int ndet, int ntime){
 	// data_array: 3*ndet*ntimes 1-D array. [ [time1], [real1], [imag1], [time2], ... ]
 	// i: det index, j: time index
@@ -377,31 +425,70 @@ void testdoubleseries(double *data_array, int ndet, int ntime){
 		printf("det%d, %f\n", i, max_snr);
 	}
 }
+*/
 
+
+COMPLEX16TimeSeries ** CreateCOMPLEX16TimeSeriesList(const double *time_arrays, const double complex *snr_arrays, const int ndet, const int *ntimes){
+
+	int i,ntime,previous_ntime;
+	LIGOTimeGPS epoch;
+    COMPLEX16TimeSeries **lalsnr_array = (COMPLEX16TimeSeries**)malloc(sizeof(COMPLEX16TimeSeries*)*ndet);
+	double start_time, deltat;
+	
+	previous_ntime=0;
+	for ( i = 0; i < ndet; i++)
+	{
+		ntime = ntimes[i]; // allow different numbers of data samples for different detectors
+		start_time = time_arrays[previous_ntime];
+		epoch.gpsSeconds = (int)start_time;
+		epoch.gpsNanoSeconds = (start_time-epoch.gpsSeconds)*1E9;
+		deltat = time_arrays[previous_ntime+1] - time_arrays[previous_ntime]; // allow different sampling rates for different detectors
+		lalsnr_array[i] = XLALCreateCOMPLEX16TimeSeries("",&epoch,0.0,deltat,&lalDimensionlessUnit,ntime);
+		lalsnr_array[i]->data->data = (COMPLEX16 *) &snr_arrays[previous_ntime];
+		lalsnr_array[i]->data->length = ntime;
+		previous_ntime += ntime;
+		//printf("%d-th lal series created.\n", i);
+	}
+	return lalsnr_array;
+}
+
+void DestroyCOMPLEX16TimeSeriesList(COMPLEX16TimeSeries **lalsnr_array, int ndet){
+	int i;
+	for ( i = 0; i > 1; i++)  // only need to free the first one??
+	{
+		//printf("destroy %d-th lal series\n", i);
+		XLALDestroyCOMPLEX16TimeSeries(lalsnr_array[i]);
+		//printf("destroy lal series done\n");
+	}
+}
 
 /*
 Coherent localization skymap with bimodal correlated-digonal prior. 
 See arXiv:2110.01874.
 */
-double *coherent_skymap_bicorr(
-				const data_streams *strain_data, 
+void coherent_skymap_bicorr(
+				double *coh_skymap_bicorr, // The probability skymap we want to return
+				const double *time_arrays, 
+				const double complex *snr_arrays, 
 				const int *detector_codes, 
-				const double *sigma, 
+				const double *sigmas, 
+				const int *ntimes,
+				const int Ndet,
 				const double *ra_grids, 
 				const double *dec_grids, 
-				int ngrid, 
-				double start_time, 
-				double end_time, 
-				int ntime,
-                double prior_mu,
-                double prior_sigma)
+				const int ngrid, 
+				const double start_time, 
+				const double end_time, 
+				const int ntime_interp,
+                const double prior_mu,
+                const double prior_sigma)
 {
-	printf("start calculating the sky map by coherent method\n");
+	//printf("start calculating the sky map by coherent method\n");
 
 	int grid_id,time_id,det_id;
-	int Ndet = strain_data->Nstream;
+	//int Ndet = strain_data->Nstream;
 	double Gsigma[2*Ndet];  
-	double dt = (end_time-start_time)/ntime;
+	double dt = (end_time-start_time)/ntime_interp;
 	double ref_gps_time = (start_time + end_time)/2.0;
 
 	LALDetector tempdet, detectors[Ndet];
@@ -409,27 +496,27 @@ double *coherent_skymap_bicorr(
 		tempdet = lalCachedDetectors[detector_codes[det_id]];
 		detectors[det_id] = tempdet;
 	}
+	COMPLEX16TimeSeries ** snr_list = CreateCOMPLEX16TimeSeriesList(time_arrays, snr_arrays, Ndet, ntimes);
+	//double *coh_skymap_bicorr = (double*)malloc(sizeof(double)*ngrid);
+	//printf("ngrid  = %d  \n",ngrid);
+	//printf("ntime  = %d  \n",ntime);
+	//printf("ndet   = %d  \n",Ndet);
 
-	double *coh_skymap_bicorr = (double*)malloc(sizeof(double)*ngrid);
-	printf("ngrid  = %d  \n",ngrid);
-	printf("ntime  = %d  \n",ntime);
-	printf("ndet   = %d  \n",Ndet);
-
-	gsl_matrix *detector_real_streams = gsl_matrix_calloc(ntime,Ndet);
-	gsl_matrix *detector_imag_streams = gsl_matrix_calloc(ntime,Ndet);
+	gsl_matrix *detector_real_streams = gsl_matrix_calloc(ntime_interp,Ndet);
+	gsl_matrix *detector_imag_streams = gsl_matrix_calloc(ntime_interp,Ndet);
 
 	gsl_matrix *M_prime = gsl_matrix_alloc(2,2);
 
 	gsl_matrix *G_sigma = gsl_matrix_alloc(Ndet,2); //same as previouly defined
 	gsl_matrix *G_sigma_transpose = gsl_matrix_alloc(2,Ndet);
 
-	gsl_matrix *J_real_streams   = gsl_matrix_calloc(ntime,2);
-	gsl_matrix *J_imag_streams   = gsl_matrix_calloc(ntime,2);
+	gsl_matrix *J_real_streams   = gsl_matrix_calloc(ntime_interp,2);
+	gsl_matrix *J_imag_streams   = gsl_matrix_calloc(ntime_interp,2);
 
 
 	LIGOTimeGPS ligo_gps_time;
 	ligo_gps_time.gpsSeconds = (int)(ref_gps_time);
-	ligo_gps_time.gpsNanoSeconds = 0;
+	ligo_gps_time.gpsNanoSeconds = (ref_gps_time-(int)(ref_gps_time)) * 1E9;
 
 
 	double mu_multimodal = prior_mu;
@@ -446,16 +533,14 @@ double *coherent_skymap_bicorr(
 		//time shift the data
 		for(det_id=0;det_id<Ndet;det_id++){
 			double time_shift = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time);
-			for(time_id=0;time_id<ntime;time_id++){
-				double complex data = step_interpolate_time_series(strain_data->streams[det_id], start_time + time_id*dt + time_shift); //&strain_data
-				//double complex data = linear_interpolate_time_series(&strain_data->streams[det_id], start_time + time_id*dt + time_shift);
-				//double complex data = quadratic_interpolate_time_series(&strain_data->streams[det_id], start_time + time_id*dt + time_shift);
+			for(time_id=0;time_id<ntime_interp;time_id++){
+				double complex data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, 0);
 				gsl_matrix_set(detector_real_streams,time_id,det_id,creal(data));
 				gsl_matrix_set(detector_imag_streams,time_id,det_id,cimag(data));
 			}
 		}
 		
-		getGsigma_matrix(detectors,sigma,Ndet,ra,dec,ref_gps_time,Gsigma);
+		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
 		//Calculate M
 		double temp_element;
 		int ii,jj;
@@ -490,7 +575,7 @@ double *coherent_skymap_bicorr(
         M0_inverse_22 = 1.0/dd0;
 		
 		//transform mf data to j stream
-		for(time_id=0;time_id<ntime;time_id++){
+		for(time_id=0;time_id<ntime_interp;time_id++){
 			double temp0_real=0;
 			double temp0_imag=0;
 			double temp1_real=0;
@@ -509,16 +594,16 @@ double *coherent_skymap_bicorr(
 
 
 		//calculate skymap
-		double snr_temp;
+		//double snr_temp;
 		double log_exp_term1,log_exp_term2,log_exp_term,log_exp_term3,log_exp_term4;
 		double j_r1,j_r2,j_i1,j_i2;
-		double snr_null_temp;
-		double log_probability_bicorr;
+		//double snr_null_temp;
+		//double log_probability_bicorr;
 		double log_prob_margT_bicorr=-100;
 		double prefactor = log(detMprime);
 		double prefactor0 = log(detM0prime);
 		coh_skymap_bicorr[grid_id]=0;
-		for(time_id=0;time_id<ntime;time_id++){
+		for(time_id=0;time_id<ntime_interp;time_id++){
 			j_r1 = gsl_matrix_get(J_real_streams,time_id,0);
 			j_r2 = gsl_matrix_get(J_real_streams,time_id,1);
 			j_i1 = gsl_matrix_get(J_imag_streams,time_id,0);
@@ -573,9 +658,10 @@ double *coherent_skymap_bicorr(
 	gsl_matrix_free(J_real_streams);
 	gsl_matrix_free(J_imag_streams);
 
+	printf("sky map done\n");
+	DestroyCOMPLEX16TimeSeriesList(snr_list,Ndet);
+	//printf("end of calculate coherent snr \n");
+	//printf("---------------------------------------\n");
 
-	printf("end of calculate coherent snr \n");
-	printf("---------------------------------------\n");
-
-	return coh_skymap_bicorr;
+	//return coh_skymap_bicorr;
 }

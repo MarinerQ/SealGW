@@ -7,11 +7,13 @@ from matplotlib import pyplot as plt
 #from ligo.skymap import postprocess
 #from astropy import units as u
 #from astropy.coordinates import SkyCoord
-#from ctypes import *
+from ctypes import *
 import os
 import lal
 import sealcore
 import spiir
+import time
+import healpy as hp
 
 def read_event_info(filepath):
     event_info = np.loadtxt(filepath)
@@ -39,20 +41,26 @@ def extract_info_from_xml(filepath):
     deff_array = np.array([])
     max_snr_array = np.array([])
     det_code_array = np.array([])
+    ntimes_array = np.array([])
+    snr_array = np.array([])
+    time_array = np.array([])
     #snr_series_list = []
     #timestamps = {det: xmlfile["snrs"][det].index.values for det in det_names}
     lal_det_code = {'L1': 6, 'H1': 5, 'V1':2, 'K1': 14, 'I1': 15}  # new lal
-    ntime = len(xmlfile["snrs"][det_names[0]].index.values)
-    data_array = np.zeros((ndet, 3, ntime ))
+    #ntime = len(xmlfile["snrs"][det_names[0]].index.values)
+    #snr_array = np.zeros((ndet, 3, ntime ), dtype=np.dtype('d'))
 
-    i=0
+    #i=0
     for det in det_names:
         deff_array = np.append(deff_array, xmlfile['tables']['postcoh']['deff_'+det])
         max_snr_array = np.append(max_snr_array, xmlfile['tables']['postcoh']['snglsnr_'+det])
         #snr_series_list.append( np.array([xmlfile["snrs"][det].index.values, np.real(xmlfile['snrs'][det]), 1*np.imag(xmlfile['snrs'][det])]).T )
         
-        data_array[i] = np.array([xmlfile["snrs"][det].index.values, np.real(xmlfile['snrs'][det]), np.imag(xmlfile['snrs'][det])]) #.T
-        i+=1
+        #snr_array[i] = np.array([xmlfile["snrs"][det].index.values, np.real(xmlfile['snrs'][det]), np.imag(xmlfile['snrs'][det])]) #.T
+        snr_array = np.append(snr_array, xmlfile['snrs'][det] )
+        time_array = np.append(time_array, xmlfile["snrs"][det].index.values)
+        ntimes_array = np.append(ntimes_array, len(xmlfile['snrs'][det]))
+        #i+=1
         det_code_array = np.append(det_code_array, int(lal_det_code[det]))
         #print("len, {}".format(len(xmlfile["snrs"][det].index.values)) )
 
@@ -67,30 +75,50 @@ def extract_info_from_xml(filepath):
     print(f'SNRs: {max_snr_array}')
     print(f'sigmas: {sigma_array}')
 
-    return trigger_time, ndet, ntime, det_code_array, max_snr_array, sigma_array, data_array
+    return trigger_time, ndet, ntimes_array.astype(c_int32), det_code_array.astype(c_int32), max_snr_array, sigma_array, time_array, snr_array
 
 
 
 if __name__ == "__main__":
-    print(sealcore.pytest1(3,8))
+    #print(sealcore.pytest1(3,8))
 
+    time0 = time.time()
     xmlfilepath = 'data/coinc_xml/H1L1V1_1187008882_3_806.xml'
-    trigger_time, ndet, ntime, det_code_array, max_snr_array, sigma_array, data_array =\
+    trigger_time, ndet, ntimes_array, det_code_array, max_snr_array, sigma_array, time_arrays, snr_arrays =\
         extract_info_from_xml(xmlfilepath)
-
-    '''
-    delta_t = 1/2048
-    lal_data_list = []
-    for i in range(ndet):
-        ep = lal.LIGOTimeGPS(snr_series_list[i][0])
-        lal_data = lal.CreateCOMPLEX8TimeSeries("test"+str(i),ep,0,delta_t,lal.DimensionlessUnit,len(snr_series_list[i]))
-        lal_data.data.data[:] = snr_series_list[i][:,1] + snr_series_list[i][:,1]*1j
-        lal_data_list.append(lal_data)
-    '''
-    data_array_1d = np.reshape(data_array, ndet*ntime*3)
-    print(data_array_1d.shape)
+    time1 = time.time()
+    print("xml file processing done! Time cost {}s.".format(time1-time0))
     
-    sealcore.PytestLALseries(data_array_1d, ndet, ntime)
+    start_time = trigger_time-0.01
+    end_time = trigger_time+0.01
+    ntime_interp = 420
+
+    nside = 16
+    npix = hp.nside2npix(nside)
+    theta, phi = hp.pixelfunc.pix2ang(nside,np.arange(npix),nest=True)
+    ra = phi
+    dec = -theta+np.pi/2
+
+    max_net_snr = sum(ss**2 for ss in max_snr_array)**0.5
+    a = 0.000466361
+    b = 0.00036214
+    c = 0.00032248
+    d = 0.0005245
+    prior_mu = a*max_net_snr + b
+    prior_sigma = c*max_net_snr +d
+
+    coh_skymap_bicorr = np.zeros(npix)
+
+    time2 = time.time()
+    sealcore.Pycoherent_skymap_bicorr(coh_skymap_bicorr, time_arrays,  snr_arrays,
+        det_code_array, sigma_array, ntimes_array,
+        ndet, ra, dec, npix,
+        start_time, end_time, ntime_interp,
+        prior_mu,prior_sigma)
+    time3 = time.time()
+
+    print("Skymap calculation done! Time cost {}s.".format(time3-time2))
+    print(coh_skymap_bicorr[0])
     
 
     

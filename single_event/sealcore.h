@@ -658,7 +658,7 @@ void coherent_skymap_bicorr(
 	gsl_matrix_free(J_real_streams);
 	gsl_matrix_free(J_imag_streams);
 
-	printf("sky map done\n");
+	//printf("sky map done\n");
 	DestroyCOMPLEX16TimeSeriesList(snr_list,Ndet);
 	//printf("end of calculate coherent snr \n");
 	//printf("---------------------------------------\n");

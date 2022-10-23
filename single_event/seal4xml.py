@@ -85,6 +85,24 @@ def generate_healpix_grids(nside):
 
     return ra,dec
 
+def how_do_I_decide_nlevel():
+    '''
+    nside_base:  16
+    nlevel = 0, nside = 16, npix = 3072, deg2 per pixel = 13.4287109375
+    nlevel = 1, nside = 32, npix = 12288, deg2 per pixel = 3.357177734375
+    nlevel = 2, nside = 64, npix = 49152, deg2 per pixel = 0.83929443359375
+    nlevel = 3, nside = 128, npix = 196608, deg2 per pixel = 0.2098236083984375
+    nlevel = 4, nside = 256, npix = 786432, deg2 per pixel = 0.052455902099609375
+    nlevel = 5, nside = 512, npix = 3145728, deg2 per pixel = 0.013113975524902344
+    nlevel = 6, nside = 1024, npix = 12582912, deg2 per pixel = 0.003278493881225586
+    '''
+    nside_base = 16
+    print('nside_base: ', nside_base)
+    for nlevel in range(7):
+        nside = nside_base * 2**nlevel
+        npix = 12 * nside**2
+        deg2perpix = 41253/npix
+        print("nlevel = {}, nside = {}, npix = {}, deg2 per pixel = {}".format(nlevel, nside, npix, deg2perpix))
 
 def seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigma_array,ntimes_array,ndet,
                                 start_time, end_time, ntime_interp, prior_mu,prior_sigma):
@@ -97,7 +115,7 @@ def seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigm
     nside_final = nside_base * 2**nlevel  # 16 *  [1,4,16,...,2^6]
     npix_final =12 * nside_final**2  # 12582912 for nlevel=6
 
-    ra, dec = generate_healpix_grids(nside_final)
+    #ra, dec = generate_healpix_grids(nside_final)
     skymap_multires = np.zeros(npix_final)
 
     # Initialize argsort
@@ -106,11 +124,11 @@ def seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigm
 
     for ilevel in range(nlevel+1):
         iside = nside_base * 2**ilevel
-        ipix = 12 * iside**2
-        ra_for_this_level, dec_for_this_level = generate_healpix_grids(iside) # len(ra_for_this_level) = ipix
+        #ipix = 12 * iside**2
+        ra_for_this_level, dec_for_this_level = generate_healpix_grids(iside) # len(ra_for_this_level) == ipix
         
-        # Calculate the first 1/4 most probable grids
-        ra_to_calculate = ra_for_this_level[argsort_pix_id]  # len(ra_to_calculate) = npix_base
+        # Calculate the first 1/4 most probable grids from previous level
+        ra_to_calculate = ra_for_this_level[argsort_pix_id]  # len(ra_to_calculate) == npix_base
         dec_to_calculate = dec_for_this_level[argsort_pix_id]
 
         # Calculate skymap (of log prob density)
@@ -123,17 +141,25 @@ def seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigm
 
         # Update skymap
         nfactor = 4**(nlevel-ilevel)  # map a pixel of this level to multiple pixels in the final level
-        for i in range(npix_base):  # Can we avoid this loop? It's 3072 times. Runs fast though. 
+        
+        for i in range(npix_base):  # Can we avoid this loop? It's 3072 times.  
             index = argsort_pix_id[i]
             skymap_multires[index*nfactor:(index+1)*nfactor] = coh_skymap_for_this_level[i]
+        '''
+        # This is even slower...
+        separated_argsort_pix_id = argsort_pix_id.reshape((npix_base,1)) * nfactor
+        mapped_final_level_pix_id = np.tile(separated_argsort_pix_id, (1, nfactor)) + np.tile(np.arange(nfactor), (npix_base,1))
+        skymap_multires[mapped_final_level_pix_id] = np.tile(coh_skymap_for_this_level.reshape((npix_base,1)), (1, nfactor))
+        '''
         
         # Update argsort
         argsort = np.argsort(coh_skymap_for_this_level)[::-1][: int(npix_base/4)]
         argsort_temp = argsort_pix_id[argsort]
+        
         for j in range(4):
-            argsort_pix_id[j::4] = argsort_temp*4+j
-
-        return skymap_multires
+            argsort_pix_id[j::4] = argsort_temp*4+j   # map to next-level grids-to-calculate
+        
+    return skymap_multires
 
 
 def plot_skymap(skymap, save_filename=None, true_ra = None, true_dec = None):
@@ -155,8 +181,8 @@ def plot_skymap(skymap, save_filename=None, true_ra = None, true_dec = None):
     #Calculate contour levels
     cls = 100 * postprocess.find_greedy_credible_levels(skymap)
 
-    #plt.figure(figsize = (10,6))
-    plt.figure()
+    plt.figure(figsize = (10,6))
+    #plt.figure()
     #Initialize skymap grid
     ax = plt.axes(projection='astro hours mollweide')
     ax.grid()
@@ -198,7 +224,7 @@ if __name__ == "__main__":
     
     start_time = trigger_time-0.01
     end_time = trigger_time+0.01
-    ntime_interp = 420
+    ntime_interp = 42*10
 
     nside = 16*16
     npix = hp.nside2npix(nside)
@@ -232,7 +258,7 @@ if __name__ == "__main__":
         start_time, end_time, ntime_interp,
         prior_mu,prior_sigma)
     '''
-    nlevel = 6
+    nlevel = 5
     coh_skymap_multires = seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigma_array,ntimes_array,ndet, start_time, end_time, ntime_interp, prior_mu,prior_sigma)
     
 

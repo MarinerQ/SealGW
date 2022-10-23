@@ -85,7 +85,7 @@ def generate_healpix_grids(nside):
 
     return ra,dec
 
-def how_do_I_decide_nlevel():
+def deg2perpix(nlevel):
     '''
     nside_base:  16
     nlevel = 0, nside = 16, npix = 3072, deg2 per pixel = 13.4287109375
@@ -97,15 +97,15 @@ def how_do_I_decide_nlevel():
     nlevel = 6, nside = 1024, npix = 12582912, deg2 per pixel = 0.003278493881225586
     '''
     nside_base = 16
-    print('nside_base: ', nside_base)
-    for nlevel in range(7):
-        nside = nside_base * 2**nlevel
-        npix = 12 * nside**2
-        deg2perpix = 41253/npix
-        print("nlevel = {}, nside = {}, npix = {}, deg2 per pixel = {}".format(nlevel, nside, npix, deg2perpix))
+    #print('nside_base: ', nside_base)
+    nside = nside_base * 2**nlevel
+    npix = 12 * nside**2
+    deg2perpix = 41252.96/npix
+
+    return deg2perpix
 
 def seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigma_array,ntimes_array,ndet,
-                                start_time, end_time, ntime_interp, prior_mu,prior_sigma):
+                                start_time, end_time, interp_factor, prior_mu,prior_sigma):
 
     # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
     # Adaptive healpix: see Bayestar paper (and our seal paper).
@@ -118,10 +118,17 @@ def seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigm
     #ra, dec = generate_healpix_grids(nside_final)
     skymap_multires = np.zeros(npix_final)
 
+    # let n_time be aligned with the finest sampled detector (as we allow different sampling rates)
+    dts = []
+    for detid in range(ndet):
+        dts.append(time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]])
+    ntime_interp = int(interp_factor*(end_time-start_time)/min(dts))
+
     # Initialize argsort
     argsort = np.arange(npix_base/4)
     argsort_pix_id = np.arange(npix_base)
 
+    
     for ilevel in range(nlevel+1):
         iside = nside_base * 2**ilevel
         #ipix = 12 * iside**2
@@ -151,7 +158,7 @@ def seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigm
         mapped_final_level_pix_id = np.tile(separated_argsort_pix_id, (1, nfactor)) + np.tile(np.arange(nfactor), (npix_base,1))
         skymap_multires[mapped_final_level_pix_id] = np.tile(coh_skymap_for_this_level.reshape((npix_base,1)), (1, nfactor))
         '''
-        
+
         # Update argsort
         argsort = np.argsort(coh_skymap_for_this_level)[::-1][: int(npix_base/4)]
         argsort_temp = argsort_pix_id[argsort]
@@ -224,7 +231,7 @@ if __name__ == "__main__":
     
     start_time = trigger_time-0.01
     end_time = trigger_time+0.01
-    ntime_interp = 42*10
+    interp_factor = 10
 
     nside = 16*16
     npix = hp.nside2npix(nside)
@@ -259,10 +266,11 @@ if __name__ == "__main__":
         prior_mu,prior_sigma)
     '''
     nlevel = 5
-    coh_skymap_multires = seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigma_array,ntimes_array,ndet, start_time, end_time, ntime_interp, prior_mu,prior_sigma)
+    coh_skymap_multires = seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigma_array,ntimes_array,ndet, start_time, end_time, interp_factor, prior_mu,prior_sigma)
     
 
     time3 = time.time()
+    print('nlevel = {}, best resolution = {} deg^2 per pixel.'.format(nlevel, deg2perpix(nlevel)))
     print("Skymap calculation done! Time cost {}s.".format(time3-time2))
     #print(coh_skymap_multires[0])
 

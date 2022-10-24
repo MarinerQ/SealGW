@@ -13,6 +13,7 @@ import lal
 import sealcore
 import spiir
 import time
+# export OMP_NUM_THREADS=8
 
 def read_event_info(filepath):
     event_info = np.loadtxt(filepath)
@@ -105,7 +106,7 @@ def deg2perpix(nlevel):
     return deg2perpix
 
 def seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigma_array,ntimes_array,ndet,
-                                start_time, end_time, interp_factor, prior_mu,prior_sigma):
+                                start_time, end_time, interp_factor, prior_mu,prior_sigma, nthread):
 
     # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
     # Adaptive healpix: see Bayestar paper (and our seal paper).
@@ -144,7 +145,7 @@ def seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigm
             det_code_array, sigma_array, ntimes_array,
             ndet, ra_to_calculate, dec_to_calculate, npix_base, 
             start_time, end_time, ntime_interp,
-            prior_mu,prior_sigma)
+            prior_mu,prior_sigma, nthread)
 
         # Update skymap
         nfactor = 4**(nlevel-ilevel)  # map a pixel of this level to multiple pixels in the final level
@@ -171,6 +172,7 @@ def seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigm
 
 def plot_skymap(skymap, save_filename=None, true_ra = None, true_dec = None):
     ''' Input: log_prob_density_skymap'''
+    #skymap = skymap - max(skymap)
     skymap = np.exp(skymap)
     skymap /= sum(skymap)
 
@@ -220,6 +222,8 @@ def plot_skymap(skymap, save_filename=None, true_ra = None, true_dec = None):
 
 
 if __name__ == "__main__":
+    #os.environ['OMP_NUM_THREADS'] = '6'
+    #os.environ['openmp'] = 'True'
     #print(sealcore.pytest1(3,8))
 
     time0 = time.time()
@@ -254,7 +258,7 @@ if __name__ == "__main__":
     end_time = trigger_time+0.01
     sigma_array = np.array([142*8.0,213*8.0,60*8.0])
     print("Time prior and horizon are manually corrected.")
-    ########### Delete above whem xml issues are fixed ###########
+    ########### Delete above when xml issues are fixed ###########
 
     time2 = time.time()
     '''
@@ -266,13 +270,14 @@ if __name__ == "__main__":
         prior_mu,prior_sigma)
     '''
     nlevel = 5
-    coh_skymap_multires = seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigma_array,ntimes_array,ndet, start_time, end_time, interp_factor, prior_mu,prior_sigma)
+    nthread = 8
+    coh_skymap_multires = seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigma_array,ntimes_array,ndet, start_time, end_time, interp_factor, prior_mu,prior_sigma,nthread)
     
 
     time3 = time.time()
-    print('nlevel = {}, best resolution = {} deg^2 per pixel.'.format(nlevel, deg2perpix(nlevel)))
-    print("Skymap calculation done! Time cost {}s.".format(time3-time2))
-    #print(coh_skymap_multires[0])
+    print('nlevel = {}, best resolution = {:.4f} deg^2 per pixel.'.format(nlevel, deg2perpix(nlevel)))
+    print("Skymap calculation done! Cost {:.2f}s using {} thread(s).".format(time3-time2, nthread))
+    
 
     plot_skymap(coh_skymap_multires, save_filename='test.pdf', true_ra = 3.446, true_dec = -0.408)
     

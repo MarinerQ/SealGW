@@ -1,8 +1,5 @@
 import numpy as np
 import healpy as hp
-import os
-import json
-
 from matplotlib import pyplot as plt
 import ligo.skymap.plot
 import astropy_healpix as ah

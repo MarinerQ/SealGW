@@ -131,8 +131,14 @@ dmypy.json
 .pyre/
 
 # outputs
-data/psd/abcd*
-data/psd/*.pdf 
-*.pdf 
-sky_grids/
-skymap/
+musigma_snr_fitting/psd/abcd*
+musigma_snr_fitting/psd/snr_A*
+musigma_snr_fitting/psd/*.pdf 
+
+single_event/sky_grids/
+single_event/skymap/
+single_event/*.pdf 
+single_event/*.o
+single_event/exe_loc
+
+.vscode/

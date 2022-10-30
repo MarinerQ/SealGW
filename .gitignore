@@ -140,5 +140,12 @@ single_event/skymap/
 single_event/*.pdf 
 single_event/*.o
 single_event/exe_loc
+single_event/cealcore.c
 
 .vscode/
+.DS_store/
+
+
+runs/
+
+clean.sh

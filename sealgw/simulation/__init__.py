@@ -1,1 +1,1 @@
-'''sealgw'''
+from . import prior_fitting,generating_data

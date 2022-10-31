@@ -26,7 +26,7 @@ setup(
     url='https://github.com/marinerq/sealgw',
     license='MIT',
     python_requires='>=3',
-    packages=["sealgw"],
+    packages=["sealgw", 'sealgw.calculation', 'sealgw.simulation'],
     install_requires=['numpy', 'scipy', 'cython', 'matplotlib', 'bilby', 'ligo.skymap', 'astropy'],
     include_dirs = [numpy.get_include()],
     setup_requires=['numpy', 'cython', 'setuptools_scm'],

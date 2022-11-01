@@ -10,10 +10,11 @@ from matplotlib.pyplot import MultipleLocator
 from bilby.gw import conversion
 from scipy.optimize import leastsq
 import json
+import ctypes
 
 from .simulation.generating_data import *
 from .simulation.prior_fitting import *
-
+from .calculation.localization import *
 
 class Seal():
     ''' 
@@ -65,6 +66,15 @@ class Seal():
             file.write(json.dumps(config_dict))
         
 
+    def uninitialize(self):
+        if self.initialized:
+            self.initialized = False
+            self.description = "An uninitialized seal."
+            self.prior_coef_a = None
+            self.prior_coef_b = None
+            self.prior_coef_c = None
+            self.prior_coef_d = None
+        print("Uninitialized.")
 
     def fitting_mu_sigma_snr_relation(self, Nsample, det_name_list, source_type, ncpu, fmin=20, duration = 32, sampling_frequency = 4096, use_bilby_psd = True, custom_psd_path = None, plotsave=None):
         if self.initialized:
@@ -139,8 +149,44 @@ class Seal():
             linear_fitting_plot(snr_steps, mu_list, sigma_list, a, b, c, d, plotsave[0])
             bimodal_fitting_plot(simulation_result, a, b, c, d, plotsave[1])
             
+
+    def localize(self, det_name_list, time_arrays, snr_arrays, max_snr, sigmas, ntimes, start_time, end_time, nthread, nlevel=5,interp_factor=10, timecost=False):
+        if self.initialized == False:
+            raise Exception("Seal not initialized!")
+
+        det_code_array = get_det_code_array(det_name_list)
+        ndet = len(det_code_array)
+
+        prior_mu = self.prior_coef_a * max_snr + self.prior_coef_b
+        prior_sigma = self.prior_coef_c * max_snr + self.prior_coef_d
+
+        time1 = time.time()
+        log_prob_skymap = seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array.astype(ctypes.c_int32),sigmas,ntimes.astype(ctypes.c_int32),ndet, start_time, end_time, interp_factor, prior_mu,prior_sigma, nthread)
+        time2 = time.time()
+
+        if timecost:
+            return log_prob_skymap, time2-time1
+        else:
+            return log_prob_skymap
     
-    def localize(self, snr_timeseries, sigmas):
-        return
+    def localize_with_spiir_xml(self, xmlfile, nthread, start_time, end_time, nlevel=5,interp_factor=10, timecost=False):
+        if self.initialized == False:
+            raise Exception("Seal not initialized!")
+        
+        trigger_time, ndet, ntimes_array, det_code_array, max_snr_array, sigma_array, time_arrays, snr_arrays =\
+            extract_info_from_xml(xmlfilepath)
+        
+        prior_mu = self.prior_coef_a * max_snr + self.prior_coef_b
+        prior_sigma = self.prior_coef_c * max_snr + self.prior_coef_d
+
+        time1 = time.time()
+        log_prob_skymap = seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigma_array,ntimes_array,ndet, start_time, end_time, interp_factor, prior_mu,prior_sigma,nthread)
+        time2 = time.time()
+
+        if timecost:
+            log_prob_skymap, time2-time1
+        else:
+            return log_prob_skymap
+
 
         

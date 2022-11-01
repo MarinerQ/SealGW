@@ -24,7 +24,7 @@ def read_event_info(filepath):
     return trigger_time, ndet, det_codes, snrs, sigmas
 
 
-def extract_info_from_xml(filepath):
+def extract_info_from_xml(filepath, return_names=False):
     xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(filepath)
 
     try:
@@ -73,7 +73,10 @@ def extract_info_from_xml(filepath):
     print(f'SNRs: {max_snr_array}')
     print(f'sigmas: {sigma_array}')
 
-    return trigger_time, ndet, ntimes_array.astype(ctypes.c_int32), det_code_array.astype(ctypes.c_int32), max_snr_array, sigma_array, time_array, snr_array
+    if return_names:
+        return trigger_time, ndet, ntimes_array.astype(ctypes.c_int32), det_names, max_snr_array, sigma_array, time_array, snr_array
+    else:
+        return trigger_time, ndet, ntimes_array.astype(ctypes.c_int32), det_code_array.astype(ctypes.c_int32), max_snr_array, sigma_array, time_array, snr_array
 
 
 def generate_healpix_grids(nside):
@@ -166,6 +169,23 @@ def seal_with_adaptive_healpix(nlevel,time_arrays,snr_arrays,det_code_array,sigm
             argsort_pix_id[j::4] = argsort_temp*4+j   # map to next-level grids-to-calculate
         
     return skymap_multires
+
+def get_det_code_array(det_name_list):
+    ''' 
+    Transfer detector name to detector code in LAL, see
+    https://lscsoft.docs.ligo.org/lalsuite/lal/_l_a_l_detectors_8h_source.html#l00168
+
+    Note in history version of LAL, the codes may be different.
+    ''' 
+    lal_det_code = {'L1': 6, 'H1': 5, 'V1':2, 'K1': 14, 'I1': 15,
+                    'CE':10, 'ET1': 16,  'ET2': 17,  'ET3': 18}  # new lal
+
+    det_code_array = np.array([])
+    for detname in det_name_list:
+        det_code_array = np.append(det_code_array, lal_det_code[detname])
+    
+    return det_code_array
+
 
 
 def plot_skymap(skymap, save_filename=None, true_ra = None, true_dec = None):

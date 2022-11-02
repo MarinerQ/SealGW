@@ -1,14 +1,12 @@
 import bilby
 import numpy as np 
 import time
-import sys
-import matplotlib.pyplot as plt
-from multiprocessing import Pool
-import multiprocessing
-from functools import partial
-from matplotlib.pyplot import MultipleLocator
 from bilby.gw import conversion
-from scipy.optimize import leastsq
+from pycbc.filter import matched_filter,matched_filter_core
+from pycbc.types.timeseries import TimeSeries
+from pycbc.types.frequencyseries import FrequencySeries
+from lal import LIGOTimeGPS
+
 
 def generate_random_spin(Nsample):
     ''' 
@@ -128,10 +126,10 @@ def get_inj_paras(parameter_values, parameter_names = ['chirp_mass','mass_ratio'
             inj_paras[parameter_names[i]] = parameter_values[i]
     return inj_paras 
 
-def calculate_snr_kernel(sample_ID, samples, ifos, wave_gen, results):
+def calculate_snr_kernel(sample_ID, samples, ifos, waveform_generator, results):
     inj_para = get_inj_paras(samples[sample_ID])
     #inj_para = bilby.gw.conversion.generate_all_bbh_parameters(inj_para)
-    h_dict = wave_gen.frequency_domain_strain(parameters=inj_para)
+    h_dict = waveform_generator.frequency_domain_strain(parameters=inj_para)
 
     net_snr_sq = 0
     for det in ifos:
@@ -140,3 +138,49 @@ def calculate_snr_kernel(sample_ID, samples, ifos, wave_gen, results):
 
     results[sample_ID] = np.sqrt(abs(net_snr_sq))
     #return np.sqrt(net_snr_sq)
+
+
+def snr_generator(ifos, waveform_generator, injection_parameter):
+    ''' 
+    Generate SNR timeseries and sigmas (waveform normalization factor).
+
+    Input:
+    ifos: bilby ifos
+    waveform_generator: bilby waveform_generator
+    injection_parameter: dict of injection parameters, as in bilby
+
+    return: two lists, as the sequence in input ifos
+    snr_timeseries_list: a list of snr timeseries (pycbc timeseries)
+    sigma_list: a list of sigmas
+    '''
+    injection_parameters_cs = injection_parameter.copy()
+    injection_parameters_cs['theta_jn'] = 0
+    injection_parameters_cs['luminosity_distance'] = 1
+
+    snr_list = []
+    sigma_list = []
+    #for i in range(len(ifos)):
+    for det in ifos:
+        #det = ifos[i]
+        freq_mask = det.frequency_mask
+        delta_t = 1. / det.strain_data.sampling_frequency
+        delta_f = det.frequency_array[1] - det.frequency_array[0]
+        epoch=LIGOTimeGPS(det.strain_data.start_time)
+        
+        d_pycbc = det.strain_data.to_pycbc_timeseries()
+        hc = waveform_generator.time_domain_strain(injection_parameters_cs)['plus']
+        hc_pycbc = TimeSeries(hc, delta_t=delta_t,epoch=epoch)
+        hc_pycbc.cyclic_time_shift(injection_parameters_cs['geocent_time'])
+        psd_pycbc = FrequencySeries(det.power_spectral_density_array, delta_f=delta_f,epoch=epoch)
+        
+        snr = matched_filter(hc_pycbc, d_pycbc, psd=psd_pycbc,
+                        low_frequency_cutoff=det.frequency_array[freq_mask][0],high_frequency_cutoff=det.frequency_array[freq_mask][-1])
+        
+        hc_fd = waveform_generator.frequency_domain_strain(injection_parameters_cs)['plus']
+        sigma = bilby.gw.utils.noise_weighted_inner_product(hc_fd, hc_fd, det.power_spectral_density_array, det.duration)
+        sigma = np.sqrt( np.real(sigma) )
+        
+        snr_list.append(snr)
+        sigma_list.append(sigma)
+    
+    return snr_list, sigma_list

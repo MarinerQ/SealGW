@@ -10,6 +10,7 @@ import ctypes
 import os
 import sealcore
 import spiir
+import spiir.io
 import time
 # export OMP_NUM_THREADS=8
 
@@ -190,7 +191,7 @@ def get_det_code_array(det_name_list):
 
 def plot_skymap(skymap, save_filename=None, true_ra = None, true_dec = None):
     ''' Input: log_prob_density_skymap'''
-    #skymap = skymap - max(skymap)
+    skymap = skymap - max(skymap)  
     skymap = np.exp(skymap)
     skymap /= sum(skymap)
 

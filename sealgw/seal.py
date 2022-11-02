@@ -2,13 +2,10 @@ import bilby
 import numpy as np 
 import time
 import sys
-import matplotlib.pyplot as plt
 from multiprocessing import Pool
 import multiprocessing
 from functools import partial
-from matplotlib.pyplot import MultipleLocator
 from bilby.gw import conversion
-from scipy.optimize import leastsq
 import json
 import ctypes
 

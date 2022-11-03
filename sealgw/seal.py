@@ -8,6 +8,10 @@ from functools import partial
 from bilby.gw import conversion
 import json
 import ctypes
+from pycbc.filter import matched_filter,matched_filter_core
+from pycbc.types.timeseries import TimeSeries
+from pycbc.types.frequencyseries import FrequencySeries
+from lal import LIGOTimeGPS
 
 from .simulation.generating_data import *
 from .simulation.prior_fitting import *
@@ -73,6 +77,20 @@ class Seal():
             self.prior_coef_d = None
         print("Uninitialized.")
 
+    def calculate_snr_kernel(sample_ID, samples, ifos, waveform_generator, results):
+        inj_para = get_inj_paras(samples[sample_ID])
+        #inj_para = bilby.gw.conversion.generate_all_bbh_parameters(inj_para)
+        h_dict = waveform_generator.frequency_domain_strain(parameters=inj_para)
+
+        net_snr_sq = 0
+        for det in ifos:
+            signal = det.get_detector_response(h_dict, inj_para)
+            net_snr_sq += det.optimal_snr_squared(signal)
+
+        results[sample_ID] = np.sqrt(abs(net_snr_sq))
+        #return np.sqrt(net_snr_sq)
+
+    
     def fitting_mu_sigma_snr_relation(self, Nsample, det_name_list, source_type, ncpu, fmin=20, duration = 32, sampling_frequency = 4096, use_bilby_psd = True, custom_psd_path = None, plotsave=None):
         if self.initialized:
             raise Exception("This seal is already initialized!")
@@ -104,7 +122,7 @@ class Seal():
         
         manager = multiprocessing.Manager()
         snrs = manager.Array('d', range(Nsample))
-        partial_work = partial(calculate_snr_kernel,samples=samples, ifos=ifos, wave_gen=waveform_generator, results=snrs)
+        partial_work = partial(calculate_snr_kernel,samples=samples, ifos=ifos, waveform_generator=waveform_generator, results=snrs)
 
         print("Computing SNR...")
         with Pool(ncpu) as p:
@@ -184,6 +202,110 @@ class Seal():
             log_prob_skymap, time2-time1
         else:
             return log_prob_skymap
+
+
+    def catalog_test_kernel(self, sample_ID, samples, det_name_list, custom_psd_path, waveform_generator, results, duration, sampling_frequency, Ncol, nthread):
+        injection_parameters = get_inj_paras(samples[sample_ID])
+        ifos = bilby.gw.detector.InterferometerList(det_name_list)
+                
+        # set detector paramaters
+        for i in range(len(ifos)):
+            det = ifos[i]
+            det.duration = duration
+            det.sampling_frequency=sampling_frequency
+            #psd_file = 'psd/{}/{}_psd.txt'.format(psd_label, det_name_list[i])
+            if custom_psd_path:  # otherwise auto-set by bilby
+                psd_file = custom_psd_path[i]
+                psd = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
+                det.power_spectral_density = psd 
+
+        ifos.set_strain_data_from_power_spectral_densities(
+            sampling_frequency=sampling_frequency, duration=duration,
+            start_time=injection_parameters['geocent_time'] - duration + 1)
+
+        ifos.inject_signal(waveform_generator=waveform_generator,
+                        parameters=injection_parameters)
+
+        snr_list, sigma_list = snr_generator(ifos, waveform_generator, injection_parameters)
+        max_snr_sq = 0
+        det_id = 0
+        for snr in snr_list:
+            peak = abs(snr).numpy().argmax()
+            snrp = snr[peak]
+            max_snr_sq += abs(snrp)**2
+            det_id +=1
+        max_snr = max_snr_sq**0.5
+
+        if max_snr<8:
+            results[0 + Ncol*sample_ID] = max_snr
+            results[1 + Ncol*sample_ID] = -1
+            results[2 + Ncol*sample_ID] = -1
+            results[3 + Ncol*sample_ID] = -1
+            results[4 + Ncol*sample_ID] = -1
+            results[5 + Ncol*sample_ID] = -1
+        else:
+            sigma_array = np.array(sigma_list)
+
+            time_arrays = np.array([])
+            snr_arrays = np.array([])
+            ntimes_array = np.array([])
+            for snr in snr_list:
+                snr_arrays = np.append(snr_arrays, snr.data)
+                time_arrays = np.append(time_arrays, snr.sample_times.data)
+                ntimes_array = np.append(ntimes_array, len(snr.sample_times.data))
+
+            start_time = injection_parameters['geocent_time'] - 0.01
+            end_time = injection_parameters['geocent_time'] + 0.01
+
+            logprob_skymap, timecost = self.localize( det_name_list, time_arrays, snr_arrays, max_snr, sigma_array, ntimes_array, start_time, end_time, nthread,  timecost=True)
+
+            true_ra = injection_parameters['ra']
+            true_dec = injection_parameters['dec']
+            confidence_areas, search_area, percentage = catalog_test_statistics(logprob_skymap, true_ra, true_dec)
+            
+            results[0 + Ncol*sample_ID] = max_snr
+            results[1 + Ncol*sample_ID] = confidence_areas[0]
+            results[2 + Ncol*sample_ID] = confidence_areas[1]
+            results[3 + Ncol*sample_ID] = search_area
+            results[4 + Ncol*sample_ID] = percentage
+            results[5 + Ncol*sample_ID] = timecost
+
+
+
+
+    def catalog_test(self, Nsample, det_name_list, source_type, ncpu, save_filename, nthread = 1, fmin=20, duration = 32, sampling_frequency = 4096, use_bilby_psd = True, custom_psd_path = None):
+        if self.initialized == False:
+            raise Exception("Seal not initialized!")
+        
+        if use_bilby_psd and custom_psd_path:
+            raise Exception("You can use only one of them: bilby PSD or your own PSD. Disable one of them. ")
+        if custom_psd_path:
+            if len(custom_psd_path) != len(det_name_list):
+                raise Exception("Number of PSDs does not match with number of detectors.")
+
+        # waveform generator and samples
+        waveform_generator = get_wave_gen(source_type, fmin,duration,sampling_frequency)
+        print("Generating source parameters...")
+        samples = get_fitting_source_para_sample(source_type,Nsample)
+        
+        
+        manager = multiprocessing.Manager()
+        Ncol = 6 # SNR, 50, 90, search, percentage, timecost
+        catalog_test_results = manager.Array('d', range(Ncol*Nsample))
+        partial_work = partial(self.catalog_test_kernel,samples=samples, det_name_list=det_name_list, custom_psd_path=custom_psd_path, waveform_generator=waveform_generator, results=catalog_test_results, duration=duration, sampling_frequency=sampling_frequency,Ncol = Ncol, nthread= nthread)
+
+        print("Localizing for them...")
+        with Pool(ncpu) as p:
+            p.map(partial_work, range(Nsample) )
+        
+        print("Done!")
+        result_reshaped = np.reshape(catalog_test_results, (Nsample, Ncol))
+        np.savetxt(save_filename, result_reshaped)
+        print("Result file saved to ", save_filename)
+
+        return result_reshaped
+
+
 
 
         

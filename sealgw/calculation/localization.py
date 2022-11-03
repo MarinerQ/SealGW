@@ -196,7 +196,7 @@ def plot_skymap(skymap, save_filename=None, true_ra = None, true_dec = None):
     skymap /= sum(skymap)
 
     npix = len(skymap)
-    nside = int(np.sqrt(npix/12.0))
+    #nside = int(np.sqrt(npix/12.0))
 
     contour = [50,90]
 
@@ -238,3 +238,99 @@ def plot_skymap(skymap, save_filename=None, true_ra = None, true_dec = None):
     if save_filename is not None:
         plt.savefig(save_filename)
         print('Skymap saved to '+ save_filename)
+
+def confidence_area(skymap, confidence_level):
+    '''
+    skymap: log prob skymap
+    confidence_level: float or array
+
+    returns confidence area at given confidence lvel.
+    '''
+    skymap = skymap - max(skymap)  
+    skymap = np.exp(skymap)
+    skymap /= sum(skymap)
+
+    nside = ah.npix_to_nside(len(skymap))
+    deg2perpix = ah.nside_to_pixel_area(nside).to_value(u.deg**2)
+    
+    cls = 100 * postprocess.find_greedy_credible_levels(skymap)
+    area = np.searchsorted(np.sort(cls), confidence_level) * deg2perpix
+
+    return area
+
+def cumulative_percentage(skymap, ra, dec):
+    ''' 
+    Find cumulative percentage at (ra, dec). 
+    
+    Small number means high prob area because we counts pixels from the highest one.
+
+    When reach the lowest prob pixel, prob accumulate to one.
+    '''
+    skymap = skymap - max(skymap)  
+    skymap = np.exp(skymap)
+    skymap /= sum(skymap)
+    
+    theta = np.pi/2 - dec
+    phi = ra
+    pixel_index = hp.pixelfunc.ang2pix(nside, theta, phi, nest=True)
+
+    prob_here = skymap[pixel_index]
+    larger_prob_index = np.where(skymap>prob_here)[0]
+
+    percentage = sum(skymap[larger_prob_index])
+
+    return percentage
+
+def search_area(skymap, ra, dec):
+    ''' 
+    Find cumulative search area at (ra, dec), search from the highest pixel.
+    
+    When reach the lowest prob pixel, prob accumulate to one.
+    '''
+    skymap = skymap - max(skymap)  
+    skymap = np.exp(skymap)
+    skymap /= sum(skymap)
+
+    nside = ah.npix_to_nside(len(skymap))
+    deg2perpix = ah.nside_to_pixel_area(nside).to_value(u.deg**2)
+    
+    theta = np.pi/2 - dec
+    phi = ra
+    pixel_index = hp.pixelfunc.ang2pix(nside, theta, phi, nest=True)
+
+    prob_here = skymap[pixel_index]
+    larger_prob_index = np.where(skymap>prob_here)[0]
+
+    area = len(larger_prob_index)*deg2perpix
+
+    return area
+
+def catalog_test_statistics(skymap, ra_inj, dec_inj):
+    ''' 
+    return all statistics that catalog test needs.
+    '''
+
+    skymap = skymap - max(skymap)  
+    skymap = np.exp(skymap)
+    skymap /= sum(skymap)
+
+    nside = ah.npix_to_nside(len(skymap))
+    deg2perpix = ah.nside_to_pixel_area(nside).to_value(u.deg**2)
+    
+    theta = np.pi/2 - dec_inj
+    phi = ra_inj
+    pixel_index = hp.pixelfunc.ang2pix(nside, theta, phi, nest=True)
+
+    prob_here = skymap[pixel_index]
+    larger_prob_index = np.where(skymap>prob_here)[0]
+
+    inj_point_cumulative_percentage = sum(skymap[larger_prob_index])
+    search_area = len(larger_prob_index)*deg2perpix
+
+    cls = 100 * postprocess.find_greedy_credible_levels(skymap)
+    confidence_level = [50, 90]
+    confidence_areas = np.searchsorted(np.sort(cls), confidence_level) * deg2perpix
+
+    return confidence_areas, search_area, inj_point_cumulative_percentage
+
+

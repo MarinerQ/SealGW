@@ -126,19 +126,7 @@ def get_inj_paras(parameter_values, parameter_names = ['chirp_mass','mass_ratio'
             inj_paras[parameter_names[i]] = parameter_values[i]
     return inj_paras 
 
-def calculate_snr_kernel(sample_ID, samples, ifos, waveform_generator, results):
-    inj_para = get_inj_paras(samples[sample_ID])
-    #inj_para = bilby.gw.conversion.generate_all_bbh_parameters(inj_para)
-    h_dict = waveform_generator.frequency_domain_strain(parameters=inj_para)
-
-    net_snr_sq = 0
-    for det in ifos:
-        signal = det.get_detector_response(h_dict, inj_para)
-        net_snr_sq += det.optimal_snr_squared(signal)
-
-    results[sample_ID] = np.sqrt(abs(net_snr_sq))
-    #return np.sqrt(net_snr_sq)
-
+###oldsnrkernel
 
 def snr_generator(ifos, waveform_generator, injection_parameter):
     ''' 

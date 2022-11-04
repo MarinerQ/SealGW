@@ -16,6 +16,4 @@ See <tt> examples/ </tt> for usage of sealgw.
 
 ## TODO
 
-* Catalog test and pp plot
-
 * Early warning development.

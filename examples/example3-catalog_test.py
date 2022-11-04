@@ -1,21 +1,7 @@
-import bilby
-import numpy as np 
-import time
-import sys
-import matplotlib.pyplot as plt
-from multiprocessing import Pool
-import multiprocessing
-from functools import partial
-from matplotlib.pyplot import MultipleLocator
-from bilby.gw import conversion
-from scipy.optimize import leastsq
-import json
-from pycbc.filter import matched_filter,matched_filter_core
-from pycbc.types.timeseries import TimeSeries
-from pycbc.types.frequencyseries import FrequencySeries
-from lal import LIGOTimeGPS
+# This script is used to generate data from example3 jupyter notebook
+# use "nohup python example3-catalog_test.py" to run it
+# It takes ~30min to run on my laptop
 
-import sealgw
 from sealgw import seal
 import sealgw.calculation as sealcal
 import sealgw.simulation as sealsim

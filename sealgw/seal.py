@@ -77,7 +77,7 @@ class Seal():
             self.prior_coef_d = None
         print("Uninitialized.")
 
-    def calculate_snr_kernel(sample_ID, samples, ifos, waveform_generator, results):
+    def _calculate_snr_kernel(self,sample_ID, samples, ifos, waveform_generator, results):
         inj_para = get_inj_paras(samples[sample_ID])
         #inj_para = bilby.gw.conversion.generate_all_bbh_parameters(inj_para)
         h_dict = waveform_generator.frequency_domain_strain(parameters=inj_para)
@@ -122,7 +122,7 @@ class Seal():
         
         manager = multiprocessing.Manager()
         snrs = manager.Array('d', range(Nsample))
-        partial_work = partial(calculate_snr_kernel,samples=samples, ifos=ifos, waveform_generator=waveform_generator, results=snrs)
+        partial_work = partial(self._calculate_snr_kernel,samples=samples, ifos=ifos, waveform_generator=waveform_generator, results=snrs)
 
         print("Computing SNR...")
         with Pool(ncpu) as p:
@@ -204,7 +204,7 @@ class Seal():
             return log_prob_skymap
 
 
-    def catalog_test_kernel(self, sample_ID, samples, det_name_list, custom_psd_path, waveform_generator, results, duration, sampling_frequency, Ncol, nthread):
+    def _catalog_test_kernel(self, sample_ID, samples, det_name_list, custom_psd_path, waveform_generator, results, duration, sampling_frequency, Ncol, nthread):
         injection_parameters = get_inj_paras(samples[sample_ID])
         ifos = bilby.gw.detector.InterferometerList(det_name_list)
                 
@@ -292,7 +292,7 @@ class Seal():
         manager = multiprocessing.Manager()
         Ncol = 6 # SNR, 50, 90, search, percentage, timecost
         catalog_test_results = manager.Array('d', range(Ncol*Nsample))
-        partial_work = partial(self.catalog_test_kernel,samples=samples, det_name_list=det_name_list, custom_psd_path=custom_psd_path, waveform_generator=waveform_generator, results=catalog_test_results, duration=duration, sampling_frequency=sampling_frequency,Ncol = Ncol, nthread= nthread)
+        partial_work = partial(self._catalog_test_kernel,samples=samples, det_name_list=det_name_list, custom_psd_path=custom_psd_path, waveform_generator=waveform_generator, results=catalog_test_results, duration=duration, sampling_frequency=sampling_frequency,Ncol = Ncol, nthread= nthread)
 
         print("Localizing for them...")
         with Pool(ncpu) as p:

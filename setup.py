@@ -15,7 +15,7 @@ sealcore = Extension(name = "sealcore",
 
 setup(
     name='sealgw',
-    version="0.0.0",
+    version="0.0.1",
     description='SealGW: SEmi-Analytical Localization for Gravitational Waves',
     author='Qian Hu',
     author_email='q.hu.2@research.gla.ac.uk',

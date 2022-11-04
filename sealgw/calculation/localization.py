@@ -12,6 +12,7 @@ import sealcore
 import spiir
 import spiir.io
 import time
+import scipy
 # export OMP_NUM_THREADS=8
 
 def read_event_info(filepath):
@@ -334,3 +335,9 @@ def catalog_test_statistics(skymap, ra_inj, dec_inj):
     return confidence_areas, search_area, inj_point_cumulative_percentage
 
 
+def confidence_band(nsamples, alpha=0.95):
+    n = nsamples
+    k = np.arange(0, n + 1)
+    p = k / n
+    ci_lo, ci_hi = scipy.stats.beta.interval(alpha, k + 1, n - k + 1)
+    return p, ci_lo, ci_hi 

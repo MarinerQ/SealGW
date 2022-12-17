@@ -9,8 +9,6 @@ from astropy.coordinates import SkyCoord
 import ctypes 
 import os
 import sealcore
-import spiir
-import spiir.io
 import time
 import scipy
 # export OMP_NUM_THREADS=8
@@ -39,7 +37,8 @@ def read_event_info(filepath):
 
 
 def extract_info_from_xml(filepath, return_names=False):
-    xmlfile = spiir.io.ligolw.coinc.load_coinc_xml(filepath)
+    import spiir.io
+    xmlfile = spiir.io.ligolw.load_coinc_xml(filepath)
 
     try:
         det_names = list(xmlfile['snrs'].keys())

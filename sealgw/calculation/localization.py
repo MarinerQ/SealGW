@@ -1,3 +1,4 @@
+import logging
 import ctypes
 
 import astropy_healpix as ah
@@ -19,6 +20,10 @@ try:
 except ModuleNotFoundError as err:
     pass
 
+LAL_DET_MAP = dict(L1=6, H1=5, V1=2, K1=14, I1=15, CE=10, ET1=16, ET2=17, ET3=18)
+
+
+logger = logging.getLogger(__name__)
 
 def read_event_info(filepath):
     event_info = np.loadtxt(filepath)
@@ -49,7 +54,6 @@ def extract_info_from_xml(filepath, return_names=False):
     ntimes_array = np.array([])
     snr_array = np.array([])
     time_array = np.array([])
-    lal_det_code = {"L1": 6, "H1": 5, "V1": 2, "K1": 14, "I1": 15}  # new lal
 
     # i=0
     for det in det_names:
@@ -60,18 +64,18 @@ def extract_info_from_xml(filepath, return_names=False):
         snr_array = np.append(snr_array, xmlfile["snrs"][det])
         time_array = np.append(time_array, xmlfile["snrs"][det].index.values)
         ntimes_array = np.append(ntimes_array, len(xmlfile["snrs"][det]))
-        det_code_array = np.append(det_code_array, int(lal_det_code[det]))
+        det_code_array = np.append(det_code_array, int(LAL_DET_MAP[det]))
 
     sigma_array = deff_array * max_snr_array
 
     trigger_time = xmlfile["tables"]["postcoh"]["end_time"].item()
     trigger_time += xmlfile["tables"]["postcoh"]["end_time_ns"].item() * 1e-9
 
-    print("xml processing done. ")
-    print(f"Trigger time: {trigger_time}")
-    print(f"Detectors: {det_names}")
-    print(f"SNRs: {max_snr_array}")
-    print(f"sigmas: {sigma_array}")
+    logger.debug("xml processing done. ")
+    logger.debug(f"Trigger time: {trigger_time}")
+    logger.debug(f"Detectors: {det_names}")
+    logger.debug(f"SNRs: {max_snr_array}")
+    logger.debug(f"sigmas: {sigma_array}")
 
     if return_names:
         return (
@@ -101,7 +105,16 @@ def generate_healpix_grids(nside):
     npix = hp.nside2npix(nside)  # equiv to 12*nside^2
     theta, phi = hp.pixelfunc.pix2ang(nside, np.arange(npix), nest=True)
     ra = phi
-    dec = -theta + np.pi / 2data
+    dec = -theta + np.pi / 2
+
+    return ra, dec
+
+
+def deg2perpix(nlevel):
+    """
+    nside_base:  16
+    nlevel = 0, nside = 16, npix = 3072, deg2 per pixel = 13.4287109375
+    nlevel = 1, nside = 32, npix = 12288, deg2 per pixel = 3.357177734375
     nlevel = 2, nside = 64, npix = 49152, deg2 per pixel = 0.83929443359375
     nlevel = 3, nside = 128, npix = 196608, deg2 per pixel = 0.2098236083984375
     nlevel = 4, nside = 256, npix = 786432, deg2 per pixel = 0.052455902099609375
@@ -232,23 +245,7 @@ def get_det_code_array(det_name_list):
     Note in history version of LAL, the codes may be different.
     """
 
-    lal_det_code = {
-        "L1": 6,
-        "H1": 5,
-        "V1": 2,
-        "K1": 14,
-        "I1": 15,
-        "CE": 10,
-        "ET1": 16,
-        "ET2": 17,
-        "ET3": 18,
-    }  # new lal
-
-    det_code_array = np.array([])
-    for detname in det_name_list:
-        det_code_array = np.append(det_code_array, lal_det_code[detname])
-
-    return det_code_array
+    return np.array([LAL_DET_MAP[det] for det in det_name_list])
 
 
 def plot_skymap(skymap, save_filename=None, true_ra=None, true_dec=None):

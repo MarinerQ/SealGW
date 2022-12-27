@@ -14,7 +14,7 @@ import scipy
 # export OMP_NUM_THREADS=8
 
 try:
-    import spiir.data
+    import spiir.io.ligolw
 except ModuleNotFoundError as err:
     pass
 
@@ -30,7 +30,7 @@ def read_event_info(filepath):
 
 
 def extract_info_from_xml(filepath, return_names=False):
-    xmlfile = spiir.data.ligolw.load_coinc_xml(filepath)
+    xmlfile = spiir.io.ligolw.load_coinc_xml(filepath)
 
     try:
         det_names = list(xmlfile['snrs'].keys())

@@ -46,10 +46,28 @@ def Pycoherent_skymap_bicorr(
 				int nthread): # 'arr' is a one-dimensional numpy array
 
     #if not coh_skymap_bicorr.flags['C_CONTIGUOUS']:
-    #    coh_skymap_bicorr = np.ascontiguousarray(coh_skymap_bicorr) # Makes a contiguous copy of the numpy array.
+	# Makes a contiguous copy of the numpy array.
+    #    coh_skymap_bicorr = np.ascontiguousarray(coh_skymap_bicorr)
 
     cdef double[:] coh_skymap_bicorr_memview = coh_skymap_bicorr
 
-    coherent_skymap_bicorr(&coh_skymap_bicorr_memview[0], &time_arrays[0], &snr_arrays[0],  &detector_codes[0], &sigmas[0], &ntimes[0], Ndet, &ra_grids[0], &dec_grids[0], ngrid, start_time, end_time, ntime_interp, prior_mu, prior_sigma, nthread)
+    coherent_skymap_bicorr(
+			&coh_skymap_bicorr_memview[0],
+			&time_arrays[0],
+			&snr_arrays[0],
+			&detector_codes[0],
+			&sigmas[0],
+			&ntimes[0],
+			Ndet,
+			&ra_grids[0],
+			&dec_grids[0],
+			ngrid,
+			start_time,
+			end_time,
+			ntime_interp,
+			prior_mu,
+			prior_sigma,
+			nthread
+	)
 
     return coh_skymap_bicorr

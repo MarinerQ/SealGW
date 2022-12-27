@@ -1,1 +1,1 @@
-from . import prior_fitting,generating_data
+from . import generating_data, prior_fitting

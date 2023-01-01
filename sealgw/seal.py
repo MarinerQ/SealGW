@@ -14,7 +14,7 @@ from .calculation.localization import (
     get_det_code_array,
     seal_with_adaptive_healpix,
 )
-from .simulation.generating_data import get_inj_paras, snr_generator
+from .simulation.generating_data import snr_generator, zip_injection_parameters
 from .simulation.prior_fitting import (
     bimodal_fitting_plot,
     fitting_abcd,
@@ -87,7 +87,7 @@ class Seal:
     def _calculate_snr_kernel(
         self, sample_ID, samples, ifos, waveform_generator, results
     ):
-        inj_para = get_inj_paras(samples[sample_ID])
+        inj_para = zip_injection_parameters(samples[sample_ID])
         # inj_para = bilby.gw.conversion.generate_all_bbh_parameters(inj_para)
         h_dict = waveform_generator.frequency_domain_strain(parameters=inj_para)
 
@@ -305,7 +305,7 @@ class Seal:
         Ncol,
         nthread,
     ):
-        injection_parameters = get_inj_paras(samples[sample_ID])
+        injection_parameters = zip_injection_parameters(samples[sample_ID])
         ifos = bilby.gw.detector.InterferometerList(det_name_list)
 
         # set detector paramaters
@@ -351,13 +351,9 @@ class Seal:
         else:
             sigma_array = np.array(sigma_list)
 
-            time_arrays = np.array([])
-            snr_arrays = np.array([])
-            ntimes_array = np.array([])
-            for snr in snr_list:
-                snr_arrays = np.append(snr_arrays, snr.data)
-                time_arrays = np.append(time_arrays, snr.sample_times.data)
-                ntimes_array = np.append(ntimes_array, len(snr.sample_times.data))
+            time_arrays = np.array([snr.sample_times.data for snr in snr_list])
+            snr_arrays = np.array([snr.data for snr in snr_list])
+            ntimes_array = np.array([len(snr.sample_times.data) for snr in snr_list])
 
             start_time = injection_parameters["geocent_time"] - 0.01
             end_time = injection_parameters["geocent_time"] + 0.01

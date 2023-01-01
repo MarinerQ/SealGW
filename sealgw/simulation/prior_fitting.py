@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.figure import Figure
 from scipy.optimize import leastsq
 
 
@@ -13,12 +14,7 @@ def select_aij_according_to_snr(file, low, high):
     selected_a22 = file[np.where((file[:, 0] >= low) * (file[:, 1] < high))][:, 4]
 
     # put aij together
-    alist = np.array([])
-    alist = np.append(alist, selected_a11)
-    alist = np.append(alist, selected_a12)
-    alist = np.append(alist, selected_a21)
-    alist = np.append(alist, selected_a22)
-    return np.array(alist)
+    return np.array([selected_a11, selected_a12, selected_a21, selected_a22])
 
 
 def f(x, mu, sigma):
@@ -48,14 +44,11 @@ def error_v1new(paras, x, n_i):
 
 
 def bins_to_center_values(bins):
-    center_values = []
-    for i in range(0, len(bins) - 1):
-        center_values.append((bins[i] + bins[i + 1]) / 2)
-    center_values = np.array(center_values)
-    return center_values
+    return np.array([((bins[i] + bins[i + 1]) / 2) for i in range(0, len(bins) - 1)])
 
 
 def ls_fit_bi(snr, samples):  # fit 2 Gaussian prior
+    # TODO: histograms should be computed with numpy instead of matplotlib
     n, bins, patches = plt.hist(samples, bins="auto", density=True)
     x = bins_to_center_values(bins)
     mu_init, sigma_init = initial_estimate(snr)
@@ -102,6 +95,8 @@ def fitting_abcd(simulation_result, snr_steps, source_type="BNS"):
         Aijs = select_aij_according_to_snr(
             simulation_result, snr_step - 1, snr_step + 1
         )
+
+        # TODO: histograms should be computed with numpy instead of matplotlib
         n, bins, patches = plt.hist(Aijs, bins="auto", density=True)
         n_list.append(n)
         bin_list.append(bins)
@@ -126,55 +121,55 @@ def linear_fitting_plot(
     c,
     d,
     save_filename=None,
-):
+) -> Figure:
     labelsize = 22
     ticksize = 18
     legendsize = "large"
 
-    plt.figure(figsize=(10, 7.5))
-    plt.rcParams.update({"font.size": 16})
+    fig, ax = plt.subplots(figsize=(10, 7.5))
 
     # plt.text(7.8, 9.5, r'x 10$^{-3}$',fontsize=16)
-    plt.yticks(size=ticksize)
-    plt.xticks(size=ticksize)
-    plt.scatter(
+    ax.set_yticks(size=ticksize)
+    ax.set_xticks(size=ticksize)
+    ax.scatter(
         snr_steps,
         1e3 * np.array(mu_list),
         marker="x",
         color="orangered",
         label=r"$\mu$",
     )
-    plt.plot(
+    ax.plot(
         snr_steps,
         1e3 * (a * snr_steps + b),
         color="royalblue",
         label=r"Linear fitting of $\mu$",
     )
-    plt.scatter(
+    ax.scatter(
         snr_steps,
         1e3 * np.array(sigma_list),
         marker="o",
         color="darkorange",
         label=r"$\sigma$",
     )
-    plt.plot(
+    ax.plot(
         snr_steps,
         1e3 * (c * snr_steps + d),
         color="forestgreen",
         label=r"Linear fitting of $\sigma$",
     )
-    plt.xlabel("Signal-to-noise Ratio", size=labelsize)
-    plt.ylabel(r"$\mu, \sigma \times$ 1000", size=labelsize)
-    plt.legend(loc="best", ncol=2, fontsize=legendsize)
-    plt.grid()
+    ax.set_xlabel("Signal-to-noise Ratio", size=labelsize)
+    ax.set_ylabel(r"$\mu, \sigma \times$ 1000", size=labelsize)
+    ax.legend(loc="best", ncol=2, fontsize=legendsize)
+    ax.grid()
 
     if save_filename:
-        plt.savefig(save_filename)
+        fig.savefig(save_filename)
+    return fig
 
 
 def bimodal_fitting_plot(
     result, a, b, c, d, test_snr_low, test_snr_high, save_filename=None
-):
+) -> Figure:
     labelsize = 18
     ticksize = 16
     legendsize = 'x-large'
@@ -183,36 +178,36 @@ def bimodal_fitting_plot(
     A_range = np.linspace(-1.1 * A_max, 1.1 * A_max, 200)
     color_bar = 'cornflowerblue'
     color_line = 'red'
-    # test_snr_low = [12, 16, 20, 24]
-    # test_snr_high = [16, 20, 24, 30]
-    nrow = int(np.ceil(len(test_snr_low) / 2))
-    plt.figure(figsize=(10, 5 * nrow))
+
+    nrows = int(np.ceil(len(test_snr_low) / 2))
+    ncols = 2
+    figsize = (10, 5 * nrows)
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
     for i in range(len(test_snr_low)):
-        j = i + 1
-        plt.subplot(nrow, 2, j)
-        plt.yticks(size=ticksize)
-        plt.xticks(size=ticksize)
+        ax = axes[i // ncols, i % ncols]
+        ax.set_yticks(size=ticksize)
+        ax.set_xticks(size=ticksize)
         snr_low = test_snr_low[i]
         snr_high = test_snr_high[i]
         snr_middle = (snr_high + snr_low) / 2
         mu = a * snr_middle + b
         sigma = c * snr_middle + b
         theo_pdf = (f(A_range, mu, sigma) + f(A_range, -mu, sigma)) / 2
-        plt.hist(
+        ax.hist(
             select_aij_according_to_snr(result, snr_low, snr_high),
             bins='auto',
             density=True,
-            label='SNR {}-{}'.format(snr_low, snr_high),
+            label=f"SNR {snr_low}-{snr_high}",
             color=color_bar,
         )
-        plt.plot(A_range, theo_pdf, color=color_line)
-        plt.ylabel('Probability density', size=labelsize)
-        plt.xlim(-1.1 * A_max, 1.1 * A_max)
-        plt.legend(loc="best", ncol=2, fontsize=legendsize)
+        ax.plot(A_range, theo_pdf, color=color_line)
+        ax.set_ylabel("Probability density", size=labelsize)
+        ax.set_xlim(-1.1 * A_max, 1.1 * A_max)
+        ax.legend(loc="best", fontsize=legendsize)
 
     if save_filename:
-        plt.savefig(save_filename)
-    # plt.show()
+        fig.savefig(save_filename)
+    return fig
 
 
 def find_horizon(ifos, waveform_generator, example_injection_parameter):

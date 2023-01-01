@@ -12,6 +12,16 @@ from pycbc.types.frequencyseries import FrequencySeries
 from pycbc.types.timeseries import TimeSeries
 from pycbc.waveform import get_fd_waveform, get_td_waveform
 
+# fmt: off
+_PARAMETERS = [
+    'chirp_mass', 'mass_ratio', 'a_1', 'a_2', 'tilt_1', 'tilt_2', 'phi_12', 'phi_jl',
+    'theta_jn', 'psi', 'phase', 'ra', 'dec', 'luminosity_distance', 'geocent_time'
+]
+PARAMETERS = {"BBH": _PARAMETERS}
+for NS_SOURCE in ["BNS", "NSBH", "BNS_EW_FD", "BNS_EW_TD"]:
+    PARAMETERS[NS_SOURCE] = _PARAMETERS + ["lambda_1", "lambda_2"]
+# fmt: on
+
 
 def generate_random_spin(Nsample):
     """
@@ -93,44 +103,24 @@ def generate_random_inject_paras(
     flow=None,
 ):
 
-    # mass:2
+    # mass: 2 parameters
     mass_1, mass_2 = generate_random_mass(
         Nsample, m1_low=m1_low, m1_high=m1_high, q_low=q_low, m2_low=m2_low
     )
     chirp_mass = component_masses_to_chirp_mass(mass_1, mass_2)
     mass_ratio = mass_2 / mass_1
 
-    # spin+thetajn:7
-    # if spin_type == 'precessing': # doesn't work for our localization algorithm.
-    #     spin_1x, spin_1y, spin_1z = generate_random_spin(Nsample)
-    #     spin_2x, spin_2y, spin_2z = generate_random_spin(Nsample)
-    #     iota = generate_random_angle(Nsample, 'cos')
+    # spin + theta_jn: 7 parameters
+    assert spin_type == "aligned", "Only aligned spins supported for this algorithm."
+    a_1 = np.random.uniform(low=0, high=a_max, size=Nsample)
+    a_2 = np.random.uniform(low=0, high=a_max, size=Nsample)
+    phi_jl = np.zeros(Nsample)
+    tilt_1 = np.zeros(Nsample)
+    tilt_2 = np.zeros(Nsample)
+    phi_12 = np.zeros(Nsample)
+    iota = generate_random_angle(Nsample, "cos")
 
-    #     fref_list = np.zeros(Nsample)+50.0
-    #     phiref_list = np.zeros(Nsample)
-    #     converted_spin = pespin.spin_angles(
-    #         mass_1,mass_2,iota , spin_1x, spin_1y, spin_1z, spin_2x, spin_2y,spin_2z,
-    #         fref_list,phiref_list
-    #     )
-
-    #     theta_jn = converted_spin[:,0]
-    #     phi_jl = converted_spin[:,1]
-    #     tilt_1 = converted_spin[:,2]
-    #     tilt_2 = converted_spin[:,3]
-    #     phi_12 = converted_spin[:,4]
-    #     a_1 = converted_spin[:,5]
-    #     a_2 = converted_spin[:,6]
-
-    if spin_type == "aligned":
-        a_1 = np.random.uniform(low=0, high=a_max, size=Nsample)
-        a_2 = np.random.uniform(low=0, high=a_max, size=Nsample)
-        phi_jl = np.zeros(Nsample)
-        tilt_1 = np.zeros(Nsample)
-        tilt_2 = np.zeros(Nsample)
-        phi_12 = np.zeros(Nsample)
-        iota = generate_random_angle(Nsample, "cos")
-
-    # others:6
+    # extrinsics: 6 parameters
     psi = generate_random_angle(Nsample, "flat", low=0, high=np.pi)
     phase = generate_random_angle(Nsample, "flat", low=0, high=2 * np.pi)
     ra = generate_random_angle(Nsample, "flat", low=0, high=2 * np.pi)
@@ -138,96 +128,29 @@ def generate_random_inject_paras(
     luminosity_distance = generate_random_distance(Nsample, low=dmin, high=dmax)
     geocent_time = np.random.uniform(low=0, high=3.14e7, size=Nsample)
 
-    # additional
+    parameter_arrays = [
+        chirp_mass, mass_ratio, a_1, a_2, tilt_1, tilt_2, phi_12, phi_jl, iota,
+        psi, phase, ra, dec, luminosity_distance, geocent_time,
+    ]  # fmt: skip
+
+    # additional parameters for non-BBH source types
     if source_type == 'BNS':
         lambda_1 = np.random.uniform(low=400, high=450, size=Nsample)
         lambda_2 = np.random.uniform(low=400, high=450, size=Nsample)
-        para_list = [
-            chirp_mass,
-            mass_ratio,
-            a_1,
-            a_2,
-            tilt_1,
-            tilt_2,
-            phi_12,
-            phi_jl,
-            iota,
-            psi,
-            phase,
-            ra,
-            dec,
-            luminosity_distance,
-            geocent_time,
-            lambda_1,
-            lambda_2,
-        ]
-
-    elif source_type == 'BBH':
-        para_list = [
-            chirp_mass,
-            mass_ratio,
-            a_1,
-            a_2,
-            tilt_1,
-            tilt_2,
-            phi_12,
-            phi_jl,
-            iota,
-            psi,
-            phase,
-            ra,
-            dec,
-            luminosity_distance,
-            geocent_time,
-        ]
+        parameter_arrays += [lambda_1, lambda_2]
 
     elif source_type == 'NSBH':
         lambda_1 = np.zeros(Nsample)
         lambda_2 = np.random.uniform(low=400, high=450, size=Nsample)
-        para_list = [
-            chirp_mass,
-            mass_ratio,
-            a_1,
-            a_2,
-            tilt_1,
-            tilt_2,
-            phi_12,
-            phi_jl,
-            iota,
-            psi,
-            phase,
-            ra,
-            dec,
-            luminosity_distance,
-            geocent_time,
-            lambda_1,
-            lambda_2,
-        ]
+        parameter_arrays += [lambda_1, lambda_2]
 
     elif source_type in ['BNS_EW_FD', 'BNS_EW_TD']:
         lambda_1 = np.random.uniform(low=400, high=450, size=Nsample)
         lambda_2 = np.random.uniform(low=400, high=450, size=Nsample)
         # premerger_time = np.zeros(Nsample) + pre_t
         # flows = np.zeros(Nsample) + flow
-        para_list = [
-            chirp_mass,
-            mass_ratio,
-            a_1,
-            a_2,
-            tilt_1,
-            tilt_2,
-            phi_12,
-            phi_jl,
-            iota,
-            psi,
-            phase,
-            ra,
-            dec,
-            luminosity_distance,
-            geocent_time,
-            lambda_1,
-            lambda_2,
-        ]
+        parameter_arrays += [lambda_1, lambda_2]
+
         # para_list = [chirp_mass,mass_ratio,a_1,a_2,tilt_1,tilt_2,phi_12,phi_jl,
         #        iota, psi, phase, ra, dec, luminosity_distance, geocent_time,
         #        lambda_1, lambda_2, premerger_time, flows]
@@ -235,77 +158,11 @@ def generate_random_inject_paras(
     else:
         raise Exception('Source type error!')
 
-    samples = np.zeros(shape=(Nsample, len(para_list)))
-    for i in range(len(para_list)):
-        samples[:, i] = para_list[i]
-    return samples
+    return np.stack(parameter_arrays, axis=1)
 
 
-def get_inj_paras(
-    parameter_values,
-    source_type,
-    parameter_names=[
-        'chirp_mass',
-        'mass_ratio',
-        'a_1',
-        'a_2',
-        'tilt_1',
-        'tilt_2',
-        'phi_12',
-        'phi_jl',
-        'theta_jn',
-        'psi',
-        'phase',
-        'ra',
-        'dec',
-        'luminosity_distance',
-        'geocent_time',
-    ],
-):
-    inj_paras = dict()
-    if source_type in ['BNS', 'NSBH']:
-        parameter_names = [
-            'chirp_mass',
-            'mass_ratio',
-            'a_1',
-            'a_2',
-            'tilt_1',
-            'tilt_2',
-            'phi_12',
-            'phi_jl',
-            'theta_jn',
-            'psi',
-            'phase',
-            'ra',
-            'dec',
-            'luminosity_distance',
-            'geocent_time',
-            'lambda_1',
-            'lambda_2',
-        ]
-    elif source_type in ['BNS_EW_FD', 'BNS_EW_TD']:
-        parameter_names = [
-            'chirp_mass',
-            'mass_ratio',
-            'a_1',
-            'a_2',
-            'tilt_1',
-            'tilt_2',
-            'phi_12',
-            'phi_jl',
-            'theta_jn',
-            'psi',
-            'phase',
-            'ra',
-            'dec',
-            'luminosity_distance',
-            'geocent_time',
-            'lambda_1',
-            'lambda_2',
-        ]
-    for i in range(len(parameter_names)):
-        inj_paras[parameter_names[i]] = parameter_values[i]
-    return inj_paras
+def zip_injection_parameters(values, source_type, names=None):
+    return dict(zip(names or PARAMETERS[source_type], values))
 
 
 def premerger_time_to_freq(pre_t, m1, m2):
@@ -334,7 +191,7 @@ def bns_truncated_fd_bilbypara(
     lambda_2,
     premerger_time,
     flow,
-    **kargs
+    **kwargs
 ):
     mass_1, mass_2 = chirp_mass_and_mass_ratio_to_component_masses(
         chirp_mass, mass_ratio
@@ -393,7 +250,7 @@ def bns_truncated_td_bilbypara(
     lambda_2,
     premerger_time,
     flow,
-    **kargs
+    **kwargs
 ):
     mass_1, mass_2 = chirp_mass_and_mass_ratio_to_component_masses(
         chirp_mass, mass_ratio
@@ -461,7 +318,7 @@ def bns_truncated_fd(
     lambda_2,
     premerger_time,
     flow,
-    **kargs
+    **kwargs
 ):
     fhigh = np.ceil(premerger_time_to_freq(premerger_time, mass_1, mass_2))
     deltaf = farray[1] - farray[0]
@@ -517,7 +374,7 @@ def bns_truncated_td(
     lambda_2,
     premerger_time,
     flow,
-    **kargs
+    **kwargs
 ):
     duration = np.ceil(tarray[-1] - tarray[0])
     if duration < premerger_time:
@@ -714,22 +571,21 @@ def snr_generator(ifos, waveform_generator, injection_parameter):
     snr_timeseries_list: a list of snr timeseries (pycbc timeseries)
     sigma_list: a list of sigmas
     """
-    injection_parameters_cs = injection_parameter.copy()
-    injection_parameters_cs["theta_jn"] = 0
-    injection_parameters_cs["luminosity_distance"] = 1
+    injection_parameters_copy = injection_parameter.copy()
+    injection_parameters_copy["theta_jn"] = 0
+    injection_parameters_copy["luminosity_distance"] = 1
 
     snr_list = []
     sigma_list = []
-    # for i in range(len(ifos)):
+
     for det in ifos:
-        # det = ifos[i]
         freq_mask = det.frequency_mask
         delta_t = 1.0 / det.strain_data.sampling_frequency
         delta_f = det.frequency_array[1] - det.frequency_array[0]
         epoch = LIGOTimeGPS(det.strain_data.start_time)
 
         d_pycbc = det.strain_data.to_pycbc_timeseries()
-        hc = waveform_generator.time_domain_strain(injection_parameters_cs)['plus']
+        hc = waveform_generator.time_domain_strain(injection_parameters_copy)['plus']
         hc_pycbc = TimeSeries(hc, delta_t=delta_t, epoch=epoch)
         # if 'premerger_time' in injection_parameters_cs.keys():
         #     cyctimeshift = (
@@ -754,11 +610,9 @@ def snr_generator(ifos, waveform_generator, injection_parameter):
             high_frequency_cutoff=det.frequency_array[freq_mask][-1],
         )
 
-        hc_fd = waveform_generator.frequency_domain_strain(injection_parameters_cs)[
-            'plus'
-        ]
+        hc_fd = waveform_generator.frequency_domain_strain(injection_parameters_copy)
         sigma = bilby.gw.utils.noise_weighted_inner_product(
-            hc_fd, hc_fd, det.power_spectral_density_array, det.duration
+            hc_fd["plus"], hc_fd["plus"], det.power_spectral_density_array, det.duration
         )
         sigma = np.sqrt(np.real(sigma))
 

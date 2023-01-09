@@ -15,6 +15,18 @@ import time
 import scipy
 # export OMP_NUM_THREADS=8
 
+def cythontestfunc(ra, dec, gpstime, detcode):
+    return sealcore.pytest1(ra, dec, gpstime, detcode)
+
+def lal_et_response_function(ra, dec, gpstime, psi, det_name, mode):
+    mode201 = {'plus': 0, 'cross': 1}
+    name2code = {'ET1': 16, 'ET2': 17, 'ET3': 18}
+
+    mode_code = mode201[mode]
+    det_code = name2code[det_name]
+
+    return sealcore.Pyet_resp_func(ra, dec, gpstime, psi, det_code, mode_code)
+
 def read_event_info(filepath):
     event_info = np.loadtxt(filepath)
     trigger_time = event_info[0]
@@ -190,7 +202,7 @@ def get_det_code_array(det_name_list):
 
 
 
-def plot_skymap(skymap, save_filename=None, true_ra = None, true_dec = None):
+def plot_skymap(skymap, save_filename=None, true_ra = None, true_dec = None, additional_text=None):
     ''' Input: log_prob_density_skymap'''
     skymap = skymap - max(skymap)  
     skymap = np.exp(skymap)
@@ -236,8 +248,11 @@ def plot_skymap(skymap, save_filename=None, true_ra = None, true_dec = None):
         text.append('{:d}% area: {:,d} deg²'.format(p, i))
     ax.text(1, 1, '\n'.join(text), transform=ax.transAxes, ha='right')
 
+    if additional_text:
+        ax.text(0, 1, additional_text, transform=ax.transAxes, ha='left')
+
     if save_filename is not None:
-        plt.savefig(save_filename)
+        plt.savefig(save_filename,dpi=100)
         print('Skymap saved to '+ save_filename)
 
 def confidence_area(skymap, confidence_level):

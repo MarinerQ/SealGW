@@ -1,9 +1,16 @@
 
 cdef extern from "sealcore.h":
-    double testfunc1(double a, double b);
+    double testfunc1(double ra, double dec, double gpstime, int detcode);
 
-def pytest1( a, b ):
-    return testfunc1( a, b )
+def pytest1(double ra, double dec, double gpstime , int detcode):
+    return testfunc1(ra, dec, gpstime,detcode )
+
+
+cdef extern from "sealcore.h":
+    double et_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode);
+
+def Pyet_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode):
+    return et_resp_func(ra, dec, gpstime, psi, detcode, mode )
 
 
 cdef extern from "sealcore.h":

@@ -77,8 +77,8 @@ class Seal():
             self.prior_coef_d = None
         print("Uninitialized.")
 
-    def _calculate_snr_kernel(self,sample_ID, samples, ifos, waveform_generator, results):
-        inj_para = get_inj_paras(samples[sample_ID])
+    def _calculate_snr_kernel(self,sample_ID, samples, ifos, waveform_generator, source_type, results):
+        inj_para = get_inj_paras(samples[sample_ID],source_type)
         #inj_para = bilby.gw.conversion.generate_all_bbh_parameters(inj_para)
         h_dict = waveform_generator.frequency_domain_strain(parameters=inj_para)
 
@@ -91,14 +91,14 @@ class Seal():
         #return np.sqrt(net_snr_sq)
 
     
-    def fitting_mu_sigma_snr_relation(self, Nsample, det_name_list, source_type, ncpu, fmin=20, duration = 32, sampling_frequency = 4096, use_bilby_psd = True, custom_psd_path = None, plotsave=None):
+    def fitting_mu_sigma_snr_relation(self, Nsample, det_name_list, source_type, ncpu, fmin=20, duration = 32, sampling_frequency = 4096, dmax=None, use_bilby_psd = True, custom_psd_path = None, plotsave=None):
         if self.initialized:
             raise Exception("This seal is already initialized!")
         if use_bilby_psd and custom_psd_path:
             raise Exception("You can use only one of them: bilby PSD or your own PSD. Disable one of them. ")
-        if custom_psd_path:
-            if len(custom_psd_path) != len(det_name_list):
-                raise Exception("Number of PSDs does not match with number of detectors.")
+        #if custom_psd_path:
+        #    if len(custom_psd_path) != len(det_name_list):
+        #        raise Exception("Number of PSDs does not match with number of detectors.")
         
 
         ifos = bilby.gw.detector.InterferometerList(det_name_list)
@@ -117,12 +117,15 @@ class Seal():
 
         # waveform generator and samples
         waveform_generator = get_wave_gen(source_type, fmin,duration,sampling_frequency)
-        samples = get_fitting_source_para_sample(source_type,Nsample)
+        if dmax is None:
+            samples = get_fitting_source_para_sample(source_type = source_type,Nsample = Nsample) 
+        else:
+            samples = get_fitting_source_para_sample(source_type = source_type,Nsample = Nsample, dmax=dmax)
         
         
         manager = multiprocessing.Manager()
         snrs = manager.Array('d', range(Nsample))
-        partial_work = partial(self._calculate_snr_kernel,samples=samples, ifos=ifos, waveform_generator=waveform_generator, results=snrs)
+        partial_work = partial(self._calculate_snr_kernel,samples=samples, ifos=ifos, waveform_generator=waveform_generator, results=snrs,source_type=source_type)
 
         print("Computing SNR...")
         with Pool(ncpu) as p:
@@ -141,7 +144,10 @@ class Seal():
 
         simulation_result = np.vstack([snrs, A11, A12, A21, A22]).T
 
-        snr_steps = np.arange(9,31,2)
+        #np.savetxt('simulation_result.txt', simulation_result)
+
+        high_snr_cutoff = np.percentile(snrs, 95)
+        snr_steps = np.arange(9, high_snr_cutoff ,2)
         a,b,c,d,mu_list,sigma_list = fitting_abcd(simulation_result, snr_steps)
 
         self.prior_coef_a = a
@@ -162,7 +168,10 @@ class Seal():
 
         if plotsave:
             linear_fitting_plot(snr_steps, mu_list, sigma_list, a, b, c, d, plotsave[0])
-            bimodal_fitting_plot(simulation_result, a, b, c, d, plotsave[1])
+            bimodalplot_high_snr_cutoff = 4* int(high_snr_cutoff/4)
+            test_snr_low = np.arange(12,bimodalplot_high_snr_cutoff,4)
+            test_snr_high = np.arange(16,bimodalplot_high_snr_cutoff,4)
+            bimodal_fitting_plot(simulation_result, a, b, c, d, test_snr_low, test_snr_high, plotsave[1])
             
 
     def localize(self, det_name_list, time_arrays, snr_arrays, max_snr, sigmas, ntimes, start_time, end_time, nthread, nlevel=5,interp_factor=10, timecost=False):
@@ -204,8 +213,8 @@ class Seal():
             return log_prob_skymap
 
 
-    def _catalog_test_kernel(self, sample_ID, samples, det_name_list, custom_psd_path, waveform_generator, results, duration, sampling_frequency, Ncol, nthread):
-        injection_parameters = get_inj_paras(samples[sample_ID])
+    def _catalog_test_kernel(self, sample_ID, samples, det_name_list, custom_psd_path, waveform_generator, results, duration, sampling_frequency, Ncol, nthread, source_type):
+        injection_parameters = get_inj_paras(samples[sample_ID], source_type)
         ifos = bilby.gw.detector.InterferometerList(det_name_list)
                 
         # set detector paramaters
@@ -292,7 +301,7 @@ class Seal():
         manager = multiprocessing.Manager()
         Ncol = 6 # SNR, 50, 90, search, percentage, timecost
         catalog_test_results = manager.Array('d', range(Ncol*Nsample))
-        partial_work = partial(self._catalog_test_kernel,samples=samples, det_name_list=det_name_list, custom_psd_path=custom_psd_path, waveform_generator=waveform_generator, results=catalog_test_results, duration=duration, sampling_frequency=sampling_frequency,Ncol = Ncol, nthread= nthread)
+        partial_work = partial(self._catalog_test_kernel,samples=samples, det_name_list=det_name_list, custom_psd_path=custom_psd_path, waveform_generator=waveform_generator, results=catalog_test_results, duration=duration, sampling_frequency=sampling_frequency,Ncol = Ncol, nthread= nthread, source_type=source_type)
 
         print("Localizing for them...")
         with Pool(ncpu) as p:
@@ -309,3 +318,77 @@ class Seal():
 
 
         
+class SealBNSEW(Seal):
+    ''' 
+    The inferface of SealGW for binary neutrion stars early warning.
+    '''
+    def __init__(self,config_dict=None, premerger_time=None, f_low=None):
+        super(SealBNSEW, self).__init__(config_dict)
+        if config_dict is None:
+            self.initialized = False
+            self.description = "An uninitialized seal."
+            self.premerger_time = premerger_time
+            self.f_low = f_low
+
+        elif type(config_dict) == dict:
+            self.prior_coef_a = config_dict['a']
+            self.prior_coef_b = config_dict['b']
+            self.prior_coef_c = config_dict['c']
+            self.prior_coef_d = config_dict['d']
+            self.description = config_dict['description']
+            self.premerger_time = config_dict['premerger_time']
+            self.f_low = config_dict['f_low']
+            self.initialized = True
+
+        elif type(config_dict) == str:
+            with open(config_dict) as f:
+                data = f.read()
+            config_dict_from_file = json.loads(data)
+            self.prior_coef_a = config_dict_from_file['a']
+            self.prior_coef_b = config_dict_from_file['b']
+            self.prior_coef_c = config_dict_from_file['c']
+            self.prior_coef_d = config_dict_from_file['d']
+            self.description = config_dict_from_file['description']
+            self.premerger_time = config_dict_from_file['premerger_time']
+            self.f_low = config_dict_from_file['f_low']
+            self.initialized = True
+        '''
+        if config_dict:
+            self.premerger_time = config_dict['premerger_time']
+            self.f_low = config_dict['f_low']
+        elif self.initialized == False:
+            self.premerger_time = premerger_time
+            self.f_low = f_low'''
+
+    def _calculate_snr_kernel(self,sample_ID, samples, ifos, waveform_generator, source_type, results):
+        inj_para = get_inj_paras(samples[sample_ID],source_type)
+        #inj_para = bilby.gw.conversion.generate_all_bns_parameters(inj_para)
+        inj_para['premerger_time'] = self.premerger_time
+        inj_para['flow'] = self.f_low
+        h_dict = waveform_generator.frequency_domain_strain(parameters=inj_para)
+
+        net_snr_sq = 0
+        for det in ifos:
+            signal = det.get_detector_response(h_dict, inj_para)
+            net_snr_sq += det.optimal_snr_squared(signal)
+
+        results[sample_ID] = np.sqrt(abs(net_snr_sq))
+
+    
+
+    def save_config_dict(self, filename):
+        if self.initialized == False:
+            raise Exception("Seal not initialized!")
+
+        config_dict = {
+            'description': self.description,
+            'a':self.prior_coef_a,
+            'b':self.prior_coef_b,
+            'c':self.prior_coef_c,
+            'd':self.prior_coef_d,
+            'premerger_time': self.premerger_time,
+            'f_low': self.f_low
+            }
+
+        with open(filename, 'w') as file:
+            file.write(json.dumps(config_dict))

@@ -32,12 +32,15 @@ def f(x,mu,sigma):
     # Normalized Gaussian PDF
     return np.exp(-(x-mu)**2/2/sigma**2)/np.sqrt(2*np.pi)/sigma
 
-def initial_estimate(snr):
+def initial_estimate(snr,source_type):
     # design noise
     mu = 0.00029915*snr - 0.0001853
     #sigma = 0.0001759*snr + 3.75904e-05
     sigma = mu/np.sqrt(2.71828*np.log(2))
 
+    if source_type == 'BBH':
+        mu = mu/10.0
+        sigma = sigma/10.0
     return mu, sigma
 
 def error_v1new(paras,x,n_i):
@@ -56,10 +59,10 @@ def bins_to_center_values(bins):
     center_values = np.array(center_values)
     return center_values
 
-def ls_fit_bi(snr,samples):  # fit 2 Gaussian prior
+def ls_fit_bi(snr,samples,source_type):  # fit 2 Gaussian prior
     n,bins,patches = plt.hist(samples,bins='auto',density=True)
     x = bins_to_center_values(bins)
-    mu_init, sigma_init = initial_estimate(snr)
+    mu_init, sigma_init = initial_estimate(snr,source_type)
     paras0=[mu_init,sigma_init]
     paras_fitted = leastsq(error_v1new,paras0,args=(x,n))[0]
     return paras_fitted
@@ -79,7 +82,7 @@ def para_conversion(d_L, iota, psi, phase):
     return A11, A12, A21, A22
 
 
-def fitting_abcd(simulation_result, snr_steps):
+def fitting_abcd(simulation_result, snr_steps, source_type='BNS'):
     mu_list=[]
     sigma_list=[]
 
@@ -93,7 +96,7 @@ def fitting_abcd(simulation_result, snr_steps):
         n_list.append(n)
         bin_list.append(bins)
 
-        paras_fit = ls_fit_bi(snr_step,Aijs)
+        paras_fit = ls_fit_bi(snr_step,Aijs,source_type)
         plt.clf() 
         mu_list.append(abs(paras_fit[0]))
         sigma_list.append(paras_fit[1])
@@ -104,7 +107,7 @@ def fitting_abcd(simulation_result, snr_steps):
     return a,b,c,d,mu_list,sigma_list
 
 
-def linear_fitting_plot(snr_steps, mu_list, sigma_list, a, b, c, d, save_filename):
+def linear_fitting_plot(snr_steps, mu_list, sigma_list, a, b, c, d, save_filename=None):
     labelsize=22
     ticksize=18
     legendsize = 'large'
@@ -124,10 +127,11 @@ def linear_fitting_plot(snr_steps, mu_list, sigma_list, a, b, c, d, save_filenam
     plt.legend(loc = 'best',ncol=2, fontsize=legendsize)
     plt.grid()
 
-    plt.savefig(save_filename)
+    if save_filename:
+        plt.savefig(save_filename)
     #plt.show()
 
-def bimodal_fitting_plot(result, a, b, c, d, test_snr_low, test_snr_high, save_filename):
+def bimodal_fitting_plot(result, a, b, c, d, test_snr_low, test_snr_high, save_filename=None):
     labelsize=18
     ticksize=16
     legendsize = 'x-large'
@@ -145,8 +149,8 @@ def bimodal_fitting_plot(result, a, b, c, d, test_snr_low, test_snr_high, save_f
         plt.subplot(nrow, 2, j)
         plt.yticks(size = ticksize)
         plt.xticks(size = ticksize)
-        snr_low = test_snr_low[i-1]
-        snr_high = test_snr_high[i-1]
+        snr_low = test_snr_low[i]
+        snr_high = test_snr_high[i]
         snr_middle = (snr_high+snr_low)/2
         mu = a*snr_middle + b
         sigma = c*snr_middle +b
@@ -157,7 +161,8 @@ def bimodal_fitting_plot(result, a, b, c, d, test_snr_low, test_snr_high, save_f
         plt.xlim(-1.1*A_max,1.1*A_max)
         plt.legend()
 
-    plt.savefig(save_filename)
+    if save_filename:
+        plt.savefig(save_filename)
     #plt.show()
 
 def find_horizon(ifos, waveform_generator, example_injection_parameter):

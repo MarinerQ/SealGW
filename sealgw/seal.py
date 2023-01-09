@@ -91,7 +91,7 @@ class Seal():
         #return np.sqrt(net_snr_sq)
 
     
-    def fitting_mu_sigma_snr_relation(self, Nsample, det_name_list, source_type, ncpu, fmin=20, duration = 32, sampling_frequency = 4096, dmax=None, use_bilby_psd = True, custom_psd_path = None, plotsave=None):
+    def fitting_mu_sigma_snr_relation(self, Nsample, det_name_list, source_type, ncpu, fmin=20, duration = 32, sampling_frequency = 4096, dmax=None, use_bilby_psd = True, custom_psd_path = None, low_snr_cutoff=None, high_snr_cutoff=None):
         if self.initialized:
             raise Exception("This seal is already initialized!")
         if use_bilby_psd and custom_psd_path:
@@ -145,9 +145,11 @@ class Seal():
         simulation_result = np.vstack([snrs, A11, A12, A21, A22]).T
 
         #np.savetxt('simulation_result.txt', simulation_result)
-
-        high_snr_cutoff = np.percentile(snrs, 95)
-        snr_steps = np.arange(9, high_snr_cutoff ,2)
+        if high_snr_cutoff is None:
+            high_snr_cutoff = np.percentile(snrs, 95)
+        if low_snr_cutoff is None:
+            low_snr_cutoff = 9
+        snr_steps = np.arange(low_snr_cutoff, high_snr_cutoff ,2)
         a,b,c,d,mu_list,sigma_list = fitting_abcd(simulation_result, snr_steps)
 
         self.prior_coef_a = a
@@ -166,12 +168,16 @@ class Seal():
         self.initialized = True
         print("Fitting done!\na = {}\nb = {}\nc = {}\nd = {}".format(a,b,c,d))
 
+        '''
         if plotsave:
             linear_fitting_plot(snr_steps, mu_list, sigma_list, a, b, c, d, plotsave[0])
             bimodalplot_high_snr_cutoff = 4* int(high_snr_cutoff/4)
             test_snr_low = np.arange(12,bimodalplot_high_snr_cutoff,4)
             test_snr_high = np.arange(16,bimodalplot_high_snr_cutoff,4)
             bimodal_fitting_plot(simulation_result, a, b, c, d, test_snr_low, test_snr_high, plotsave[1])
+        '''
+
+        return simulation_result
             
 
     def localize(self, det_name_list, time_arrays, snr_arrays, max_snr, sigmas, ntimes, start_time, end_time, nthread, nlevel=5,interp_factor=10, timecost=False):

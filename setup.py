@@ -5,8 +5,6 @@ import numpy
 
 sealcore = Extension(name = "sealcore",
                   sources=['sealgw/calculation/cealcore.pyx'],
-                  #include_dirs=['/apps/skylake/software/GSL/2.5-GCC-9.2.0/include/','/fred/oz016/opt-pipe/include/'],
-                  #library_dirs=['/apps/skylake/software/GSL/2.5-GCC-9.2.0/lib', '/fred/oz016/opt-pipe/lib'],
                   libraries=['m', 'gsl', 'gslcblas', 'lal'],
                   language='c',
                   extra_compile_args=['-fopenmp', '-O3'],  #'-fopenmp', '-O3','-lboost_python39'

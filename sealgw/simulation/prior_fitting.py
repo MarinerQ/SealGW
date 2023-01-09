@@ -32,12 +32,15 @@ def f(x,mu,sigma):
     # Normalized Gaussian PDF
     return np.exp(-(x-mu)**2/2/sigma**2)/np.sqrt(2*np.pi)/sigma
 
-def initial_estimate(snr):
+def initial_estimate(snr,source_type):
     # design noise
     mu = 0.00029915*snr - 0.0001853
     #sigma = 0.0001759*snr + 3.75904e-05
     sigma = mu/np.sqrt(2.71828*np.log(2))
 
+    if source_type == 'BBH':
+        mu = mu/10.0
+        sigma = sigma/10.0
     return mu, sigma
 
 def error_v1new(paras,x,n_i):
@@ -56,10 +59,10 @@ def bins_to_center_values(bins):
     center_values = np.array(center_values)
     return center_values
 
-def ls_fit_bi(snr,samples):  # fit 2 Gaussian prior
+def ls_fit_bi(snr,samples,source_type):  # fit 2 Gaussian prior
     n,bins,patches = plt.hist(samples,bins='auto',density=True)
     x = bins_to_center_values(bins)
-    mu_init, sigma_init = initial_estimate(snr)
+    mu_init, sigma_init = initial_estimate(snr,source_type)
     paras0=[mu_init,sigma_init]
     paras_fitted = leastsq(error_v1new,paras0,args=(x,n))[0]
     return paras_fitted
@@ -79,26 +82,7 @@ def para_conversion(d_L, iota, psi, phase):
     return A11, A12, A21, A22
 
 
-def get_inj_paras(parameter_values, parameter_names = ['chirp_mass','mass_ratio','a_1','a_2','tilt_1','tilt_2','phi_12','phi_jl',
-                'theta_jn','psi','phase','ra','dec','luminosity_distance','geocent_time']):
-    inj_paras = dict()
-    for i in range(len(parameter_names)):
-            inj_paras[parameter_names[i]] = parameter_values[i]
-    return inj_paras 
-
-def calculate_snr_kernel(sample_ID, samples, ifos, wave_gen, results):
-    inj_para = get_inj_paras(samples[sample_ID])
-    #inj_para = bilby.gw.conversion.generate_all_bbh_parameters(inj_para)
-    h_dict = wave_gen.frequency_domain_strain(parameters=inj_para)
-
-    net_snr_sq = 0
-    for det in ifos:
-        signal = det.get_detector_response(h_dict, inj_para)
-        net_snr_sq += det.optimal_snr_squared(signal)
-
-    results[sample_ID] = np.sqrt(abs(net_snr_sq))
-
-def fitting_abcd(simulation_result, snr_steps):
+def fitting_abcd(simulation_result, snr_steps, source_type='BNS'):
     mu_list=[]
     sigma_list=[]
 
@@ -112,9 +96,9 @@ def fitting_abcd(simulation_result, snr_steps):
         n_list.append(n)
         bin_list.append(bins)
 
-        paras_fit = ls_fit_bi(snr_step,Aijs)
+        paras_fit = ls_fit_bi(snr_step,Aijs,source_type)
         plt.clf() 
-        mu_list.append(paras_fit[0])
+        mu_list.append(abs(paras_fit[0]))
         sigma_list.append(paras_fit[1])
 
     a,b = np.polyfit(snr_steps,mu_list,1)
@@ -122,56 +106,8 @@ def fitting_abcd(simulation_result, snr_steps):
 
     return a,b,c,d,mu_list,sigma_list
 
-def get_wave_gen(source_type,fmin,duration,sampling_frequency):
 
-    if source_type == 'BNS':
-        waveform_arguments = dict(waveform_approximant='TaylorF2',
-                                    reference_frequency=50., minimum_frequency=fmin)
-        waveform_generator = bilby.gw.WaveformGenerator(
-            duration=duration, sampling_frequency=sampling_frequency,
-            frequency_domain_source_model=bilby.gw.source.lal_binary_neutron_star,
-            parameter_conversion=bilby.gw.conversion.convert_to_lal_binary_neutron_star_parameters,
-            waveform_arguments=waveform_arguments)
-
-    elif source_type == 'BBH':
-        waveform_arguments = dict(waveform_approximant='IMRPhenomPv2',
-                                    reference_frequency=50., minimum_frequency=fmin)
-        waveform_generator = bilby.gw.WaveformGenerator(
-            duration=duration, sampling_frequency=sampling_frequency,
-            frequency_domain_source_model=bilby.gw.source.lal_binary_black_hole,
-            parameter_conversion=bilby.gw.conversion.convert_to_lal_binary_black_hole_parameters,
-            waveform_arguments=waveform_arguments)
-    
-    elif source_type == 'NSBH':
-        waveform_arguments = dict(waveform_approximant='IMRPhenomNSBH',
-                                    reference_frequency=50., minimum_frequency=fmin)
-        waveform_generator = bilby.gw.WaveformGenerator(
-            duration=duration, sampling_frequency=sampling_frequency,
-            frequency_domain_source_model=bilby.gw.source.lal_binary_neutron_star,
-            waveform_arguments=waveform_arguments)
-
-    else:
-        raise('Source type error!')
-
-    return waveform_generator
-
-def get_fitting_source_para_sample(source_type,Nsample):
-    if source_type == 'BNS':
-        samples = generating_data.generate_random_inject_paras(Nsample=Nsample,dmin = 0, dmax=200,m1_low=1.1,m1_high=2, q_low = 0.8, a_max=0.1, m2_low=1.1)
-
-    elif source_type == 'BBH':
-        samples = generating_data.generate_random_inject_paras(Nsample=Nsample,dmin = 0, dmax=4000,m1_low=6,m1_high=90, q_low = 0.25, a_max=0.1, m2_low=6)
-    
-    elif source_type == 'NSBH':
-        samples = generating_data.generate_random_inject_paras(Nsample=Nsample,dmin = 0, dmax=500,m1_low=6,m1_high=90, q_low = 0.1, a_max=0.1, m2_low=1.1)
-
-    else:
-        raise('Source type error!')
-    
-    return samples
-
-
-def linear_fitting_plot(snr_steps, mu_list, sigma_list, a, b, c, d, save_filename):
+def linear_fitting_plot(snr_steps, mu_list, sigma_list, a, b, c, d, save_filename=None):
     labelsize=22
     ticksize=18
     legendsize = 'large'
@@ -191,26 +127,30 @@ def linear_fitting_plot(snr_steps, mu_list, sigma_list, a, b, c, d, save_filenam
     plt.legend(loc = 'best',ncol=2, fontsize=legendsize)
     plt.grid()
 
-    plt.savefig(save_filename)
+    if save_filename:
+        plt.savefig(save_filename)
     #plt.show()
 
-def bimodal_fitting_plot(result, a, b, c, d, save_filename):
+def bimodal_fitting_plot(result, a, b, c, d, test_snr_low, test_snr_high, save_filename=None):
     labelsize=18
     ticksize=16
     legendsize = 'x-large'
 
-    A_range = np.linspace(-0.04,0.04,200)
-    plt.figure(figsize=(14,10))
+    A_max = np.percentile(abs(result[:,1]), 99)
+    A_range = np.linspace(-1.1*A_max,1.1*A_max,200)
     color_bar = 'cornflowerblue'
     color_line = 'red'
-    test_snr_low = [12, 16, 20, 24]
-    test_snr_high = [16, 20, 24, 30]
-    for i in [1,2,3,4]:
-        plt.subplot(2,2,i)
+    #test_snr_low = [12, 16, 20, 24]
+    #test_snr_high = [16, 20, 24, 30]
+    nrow = int(np.ceil(len(test_snr_low)/2))
+    plt.figure(figsize=(10,5*nrow))
+    for i in range(len(test_snr_low)):
+        j=i+1
+        plt.subplot(nrow, 2, j)
         plt.yticks(size = ticksize)
         plt.xticks(size = ticksize)
-        snr_low = test_snr_low[i-1]
-        snr_high = test_snr_high[i-1]
+        snr_low = test_snr_low[i]
+        snr_high = test_snr_high[i]
         snr_middle = (snr_high+snr_low)/2
         mu = a*snr_middle + b
         sigma = c*snr_middle +b
@@ -218,8 +158,24 @@ def bimodal_fitting_plot(result, a, b, c, d, save_filename):
         plt.hist(select_aij_according_to_snr(result, snr_low, snr_high),bins='auto',density=True, label='SNR {}-{}'.format(snr_low,snr_high),color=color_bar)
         plt.plot(A_range,theo_pdf,color=color_line)
         plt.ylabel('Probability density',size=labelsize)
-        plt.xlim(-0.05,0.05)
+        plt.xlim(-1.1*A_max,1.1*A_max)
         plt.legend()
 
-    plt.savefig(save_filename)
+    if save_filename:
+        plt.savefig(save_filename)
     #plt.show()
+
+def find_horizon(ifos, waveform_generator, example_injection_parameter):
+    example_injection_parameter['luminosity_distance'] = 1
+    h_dict = waveform_generator.frequency_domain_strain(example_injection_parameter)
+
+    netsnrsq = 0
+    for det in ifos:
+        #signal = det.get_detector_response(h_dict, example_injection_parameter)
+        netsnrsq += det.optimal_snr_squared(h_dict['plus'])
+    
+    netsnr = np.real(netsnrsq)**0.5
+
+    # set snr=8 as detection threshold
+    return netsnr/8 
+

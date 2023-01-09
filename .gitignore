@@ -137,6 +137,6 @@ dmypy.json
 .DS_Store/
 
 
-runs/
+tests/
 
 clean.sh

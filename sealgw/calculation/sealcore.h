@@ -360,42 +360,53 @@ static void getGsigma_matrix(const LALDetector *detectors,const double *sigma, i
 
 }
 
+double et_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode){
+	/*
+	Bilby has different geometry for ET in bilby and LAL. This function calculate ET's response functions in LAL.
+	*/
+	LALDetector tempdet;
+	double fplus,fcross,gmst;
+	LIGOTimeGPS gps_time_ligo;
+	gps_time_ligo.gpsSeconds = (int)gpstime;
+	gps_time_ligo.gpsNanoSeconds = (int)(gpstime-(int)gpstime)*1000000000;
+	gmst = XLALGreenwichMeanSiderealTime(&gps_time_ligo);
 
+	tempdet = lalCachedDetectors[detcode];
+	ComputeDetAMResponse(&fplus,&fcross,tempdet.response,ra,dec,psi,gmst);
 
-double testfunc1(double a, double b){
-	return a*b;
-}
-
-/*
-void testdoubleseries(double *data_array, int ndet, int ntime){
-	// data_array: 3*ndet*ntimes 1-D array. [ [time1], [real1], [imag1], [time2], ... ]
-	// i: det index, j: time index
-	// time_ij: 3*ntime*i + j = 3i*ntime + j
-	// real_ij: 3*ntime*i + ntime + j = (3i+1)*ntime + j
-	// imag_ij: 3*ntime*i + 2*ntime + j = (3i+2)*ntime + j
-	int i, j;
-	double max_snr, temp_snr,temp_r,temp_i;
-	double *c8ts;
-	//char name;
-	double complex *snr;
-	for ( i = 0; i < ndet; i++)
+	if(mode==0)
 	{
-		max_snr = 0;
-		for (j = 0; j < ntime; j++)
-		{
-			temp_r = data_array[(3*i+1)*ntime + j];
-			temp_i = data_array[(3*i+2)*ntime + j];
-			temp_snr = sqrt(temp_r*temp_r + temp_i*temp_i);
-			if (temp_snr>max_snr)
-			{
-				max_snr=temp_snr;
-			}
-		}
-		//printf("%c, %f\n", name, max_snr);
-		printf("det%d, %f\n", i, max_snr);
+		return fplus;
 	}
+	else if (mode==1)
+	{
+		return fcross;
+	}
+	
 }
-*/
+
+double testfunc1(double ra, double dec, double gpstime, int detcode){
+	int det_id, Ndet=3;
+    //int detector_codes[3] = {16, 17, 18};
+	LALDetector tempdet;
+	double fplus,fcross,gmst;
+	LIGOTimeGPS gps_time_ligo;
+	gps_time_ligo.gpsSeconds = (int)gpstime;
+	gps_time_ligo.gpsNanoSeconds = (int)(gpstime-(int)gpstime)*1000000000;
+	gmst = XLALGreenwichMeanSiderealTime(&gps_time_ligo);
+
+	tempdet = lalCachedDetectors[detcode];
+	ComputeDetAMResponse(&fplus,&fcross,tempdet.response,ra,dec,0.0,gmst);
+	return fplus;
+	/*
+    for(det_id=0; det_id<Ndet; det_id++){
+		tempdet = lalCachedDetectors[detector_codes[det_id]];
+        ComputeDetAMResponse(&fplus,&fcross,tempdet.response,ra,dec,0.0,gmst);
+        printf("ET%d, ra=%f, dec=%f, gmst=%f\n", detector_codes[det_id]-15, ra, dec, gmst);
+        printf("fp=%f, fc=%f\n",fplus, fcross );
+	}*/
+	//return 0.0;
+}
 
 
 COMPLEX16TimeSeries ** CreateCOMPLEX16TimeSeriesList(const double *time_arrays, const double complex *snr_arrays, const int ndet, const int *ntimes){

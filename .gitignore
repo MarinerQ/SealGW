@@ -134,7 +134,7 @@ dmypy.json
 
 *.out 
 .vscode/
-.DS_Store/
+.DS_Store
 
 
 tests/

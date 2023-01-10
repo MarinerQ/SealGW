@@ -7,13 +7,12 @@ import healpy as hp
 import ligo.skymap.plot
 import numpy as np
 import scipy
+import sealcore
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from ligo.skymap import postprocess
 from matplotlib import figure as Figure
 from matplotlib import pyplot as plt
-
-import sealcore
 
 # export OMP_NUM_THREADS=8
 
@@ -30,6 +29,7 @@ def lal_et_response_function(ra, dec, gpstime, psi, det_name, mode):
     det_code = name2code[det_name]
 
     return sealcore.Pyet_resp_func(ra, dec, gpstime, psi, det_code, mode_code)
+
 
 LAL_DET_MAP = dict(L1=6, H1=5, V1=2, K1=14, I1=15, CE=10, ET1=16, ET2=17, ET3=18)
 
@@ -77,18 +77,6 @@ def extract_info_from_xml(filepath, return_names=False):
         )
         snr_array = np.append(snr_array, xmlfile["snrs"][det])
         time_array = np.append(time_array, xmlfile["snrs"][det].index.values)
-PARAMETERS = (
-    "chirp_mass", "mass_ratio", "a_1", "a_2", "tilt_1", "tilt_2", "phi_12", "phi_jl",
-    "theta_jn", "psi", "phase", "ra", "dec", "luminosity_distance", "geocent_time",
-)  # fmt: skip
-PARAMETERS = (
-    "chirp_mass", "mass_ratio", "a_1", "a_2", "tilt_1", "tilt_2", "phi_12", "phi_jl",
-    "theta_jn", "psi", "phase", "ra", "dec", "luminosity_distance", "geocent_time",
-)  # fmt: skip
-
-
-
-
         ntimes_array = np.append(ntimes_array, len(xmlfile["snrs"][det]))
         det_code_array = np.append(det_code_array, int(LAL_DET_MAP[det]))
 

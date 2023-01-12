@@ -1,5 +1,6 @@
 import bilby
 import numpy as np
+import spiir
 from bilby.gw.conversion import (
     chirp_mass_and_mass_ratio_to_component_masses,
     component_masses_to_chirp_mass,
@@ -45,14 +46,26 @@ def generate_random_spin(Nsample):
 
 def generate_random_mass(Nsample, m1_low, m1_high, q_low, m2_low):
     m1 = np.random.uniform(low=m1_low, high=m1_high, size=Nsample)
-    mass_ratio = np.random.uniform(low=q_low, high=1, size=Nsample)
 
-    m2 = m1 * mass_ratio
-    index = np.where(m2 < m2_low)[0]
-    while len(index) != 0:
-        corrected_mass_ratio = np.random.uniform(low=q_low, high=1, size=len(index))
-        m2[index] = m1[index] * corrected_mass_ratio
+    if m1_low > 5 and m2_low < 3:  # is NSBH
+        m2 = np.random.uniform(low=m2_low, high=2, size=Nsample)
+        mass_ratio = m2 / m1
+        index = np.where(mass_ratio < q_low)[0]
+        while len(index) != 0:
+            corrected_mass_1 = np.random.uniform(
+                low=m1_low, high=m1_high, size=len(index)
+            )
+            m1[index] = corrected_mass_1
+            mass_ratio = m2 / m1
+            index = np.where(mass_ratio < q_low)[0]
+    else:
+        mass_ratio = np.random.uniform(low=q_low, high=1, size=Nsample)
+        m2 = m1 * mass_ratio
         index = np.where(m2 < m2_low)[0]
+        while len(index) != 0:
+            corrected_mass_ratio = np.random.uniform(low=q_low, high=1, size=len(index))
+            m2[index] = m1[index] * corrected_mass_ratio
+            index = np.where(m2 < m2_low)[0]
 
     return m1, m2
 
@@ -487,6 +500,112 @@ def get_wave_gen(source_type, fmin, duration, sampling_frequency):
     return waveform_generator
 
 
+def get_example_injpara(source_type):
+    '''
+    This function is used to generate an example injection parameter for (lower bound) horizon estimation.
+    It therefore gives lighter masses.
+    '''
+    example_injection_parameter = dict()
+
+    if source_type == 'BNS':
+        mc = bilby.gw.conversion.component_masses_to_chirp_mass(1.2, 1.2)
+        example_injection_parameter['chirp_mass'] = mc
+        example_injection_parameter['mass_ratio'] = 1
+        example_injection_parameter['a_1'] = 0
+        example_injection_parameter['a_2'] = 0
+        example_injection_parameter['tilt_1'] = 0
+        example_injection_parameter['tilt_2'] = 0
+        example_injection_parameter['phi_12'] = 0
+        example_injection_parameter['phi_jl'] = 0
+        example_injection_parameter['lambda_1'] = 425
+        example_injection_parameter['lambda_2'] = 425
+
+        example_injection_parameter['theta_jn'] = 0
+        example_injection_parameter['psi'] = 0
+        example_injection_parameter['phase'] = 0
+        example_injection_parameter['ra'] = 0
+        example_injection_parameter['dec'] = 0
+        example_injection_parameter['luminosity_distance'] = 1
+        example_injection_parameter['geocent_time'] = 0
+
+    elif source_type == 'BBH':
+        mc = bilby.gw.conversion.component_masses_to_chirp_mass(10, 10)
+        example_injection_parameter['chirp_mass'] = mc
+        example_injection_parameter['mass_ratio'] = 1
+        example_injection_parameter['a_1'] = 0
+        example_injection_parameter['a_2'] = 0
+        example_injection_parameter['tilt_1'] = 0
+        example_injection_parameter['tilt_2'] = 0
+        example_injection_parameter['phi_12'] = 0
+        example_injection_parameter['phi_jl'] = 0
+
+        example_injection_parameter['theta_jn'] = 0
+        example_injection_parameter['psi'] = 0
+        example_injection_parameter['phase'] = 0
+        example_injection_parameter['ra'] = 0
+        example_injection_parameter['dec'] = 0
+        example_injection_parameter['luminosity_distance'] = 1
+        example_injection_parameter['geocent_time'] = 0
+
+    elif source_type == 'NSBH':
+        mc = bilby.gw.conversion.component_masses_to_chirp_mass(10, 1.4)
+        example_injection_parameter['chirp_mass'] = mc
+        example_injection_parameter['mass_ratio'] = 1.4 / 10
+        example_injection_parameter['a_1'] = 0
+        example_injection_parameter['a_2'] = 0
+        example_injection_parameter['tilt_1'] = 0
+        example_injection_parameter['tilt_2'] = 0
+        example_injection_parameter['phi_12'] = 0
+        example_injection_parameter['phi_jl'] = 0
+        example_injection_parameter['lambda_1'] = 0
+        example_injection_parameter['lambda_2'] = 425
+
+        example_injection_parameter['theta_jn'] = 0
+        example_injection_parameter['psi'] = 0
+        example_injection_parameter['phase'] = 0
+        example_injection_parameter['ra'] = 0
+        example_injection_parameter['dec'] = 0
+        example_injection_parameter['luminosity_distance'] = 1
+        example_injection_parameter['geocent_time'] = 0
+
+    elif source_type == 'BNS_EW_FD':
+        raise Exception('This function is under development!')
+
+    elif source_type == 'BNS_EW_TD':
+        raise Exception('This function is under development!')
+
+    else:
+        raise Exception('Source type error!')
+
+    return example_injection_parameter
+
+
+def get_ifos(det_name_list, duration, sampling_frequency, custom_psd_path):
+    ifos = bilby.gw.detector.InterferometerList(det_name_list)
+
+    # set detector paramaters
+    for i in range(len(ifos)):
+        det = ifos[i]
+        det.duration = duration
+        det.sampling_frequency = sampling_frequency
+        # psd_file = 'psd/{}/{}_psd.txt'.format(psd_label, det_name_list[i])
+        if custom_psd_path:  # otherwise auto-set by bilby
+            if type(custom_psd_path) == str and '.xml' in custom_psd_path:
+                temppsd = spiir.io.ligolw.array.load_psd_series_from_xml(
+                    custom_psd_path
+                )[det_name_list[i]]
+                psdarray = temppsd.to_numpy()
+                freqarray = temppsd.index.to_numpy()
+                psd = bilby.gw.detector.PowerSpectralDensity(
+                    frequency_array=freqarray, psd_array=psdarray
+                )
+            elif type(custom_psd_path) == list:
+                psd_file = custom_psd_path[i]
+                psd = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
+            det.power_spectral_density = psd
+    return ifos
+
+
 def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
     if source_type == 'BNS':
         dmax = 200
@@ -530,7 +649,7 @@ def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
             dmax=dmax,
             m1_low=6,
             m1_high=90,
-            q_low=0.1,
+            q_low=0.05,
             a_max=0.1,
             m2_low=1.1,
             source_type=source_type,

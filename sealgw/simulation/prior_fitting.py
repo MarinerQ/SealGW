@@ -1,3 +1,5 @@
+import json
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
@@ -223,3 +225,24 @@ def find_horizon(ifos, waveform_generator, example_injection_parameter):
 
     # set snr=8 as detection threshold
     return netsnr / 8
+
+
+def save_configs(source_types, label, seallist, outputfilename):
+    if len(source_types) != len(seallist):
+        raise Exception('len(source_types) != len(seallist).')
+
+    config_dict_dict = dict()
+    for i in range(len(source_types)):
+        source_type = source_types[i]
+        tempseal = seallist[i]
+        config_dict = {
+            'description': tempseal.description,
+            'a': tempseal.prior_coef_a,
+            'b': tempseal.prior_coef_b,
+            'c': tempseal.prior_coef_c,
+            'd': tempseal.prior_coef_d,
+        }
+        config_dict_dict[source_type] = config_dict
+
+    with open(outputfilename, 'w') as file:
+        file.write(json.dumps(config_dict_dict))

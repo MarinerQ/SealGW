@@ -19,6 +19,7 @@ install_requires = [
     'bilby',
     'ligo.skymap',
     'astropy',
+    'spiir @ git+https://git.ligo.org/spiir-group/spiir.git@main#egg=spiir',
 ]
 
 setup(

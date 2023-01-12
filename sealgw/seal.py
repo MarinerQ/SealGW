@@ -1,5 +1,6 @@
 import ctypes
 import json
+import logging
 import multiprocessing
 import time
 from functools import partial
@@ -22,6 +23,8 @@ from .simulation.generating_data import (
 )
 from .simulation.prior_fitting import fitting_abcd, para_conversion
 
+logger = logging.getLogger(__name__)
+
 
 class Seal:
     """
@@ -31,7 +34,7 @@ class Seal:
     and to localize GW events.
     """
 
-    def __init__(self, config_dict=None):
+    def __init__(self, config_dict=None, source_type=None):
         if config_dict is None:
             self.initialized = False
             self.description = "An uninitialized seal."
@@ -49,11 +52,18 @@ class Seal:
             with open(config_dict) as f:
                 data = f.read()
             config_dict_from_file = json.loads(data)
-            self.prior_coef_a = config_dict_from_file["a"]
-            self.prior_coef_b = config_dict_from_file["b"]
-            self.prior_coef_c = config_dict_from_file["c"]
-            self.prior_coef_d = config_dict_from_file["d"]
-            self.description = config_dict_from_file["description"]
+            if source_type is not None:
+                try:
+                    config_dict_from_file = config_dict_from_file[source_type]
+                except:
+                    logger.debug(
+                        'Warning: Config file does not include multiple source types. Reading from it directly.'
+                    )
+            self.prior_coef_a = config_dict_from_file['a']
+            self.prior_coef_b = config_dict_from_file['b']
+            self.prior_coef_c = config_dict_from_file['c']
+            self.prior_coef_d = config_dict_from_file['d']
+            self.description = config_dict_from_file['description']
 
             self.initialized = True
 
@@ -80,7 +90,7 @@ class Seal:
             self.prior_coef_b = None
             self.prior_coef_c = None
             self.prior_coef_d = None
-        print("Uninitialized.")
+        logger.debug("Uninitialized.")
 
     def _calculate_snr_kernel(
         self, sample_ID, samples, ifos, waveform_generator, source_type, results
@@ -122,26 +132,23 @@ class Seal:
         #    if len(custom_psd_path) != len(det_name_list):
         #    raise Exception("Number of PSDs does not match number of detectors.")
 
-        ifos = bilby.gw.detector.InterferometerList(det_name_list)
-
-        # set detector paramaters
-        for i in range(len(ifos)):
-            det = ifos[i]
-            det.duration = duration
-            det.sampling_frequency = sampling_frequency
-            # psd_file = 'psd/{}/{}_psd.txt'.format(psd_label, det_name_list[i])
-            if custom_psd_path:  # otherwise auto-set by bilby
-                psd_file = custom_psd_path[i]
-                psd = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
-                det.power_spectral_density = psd
-
+        ifos = get_ifos(det_name_list, duration, sampling_frequency, custom_psd_path)
         # waveform generator and samples
         waveform_generator = get_wave_gen(
             source_type, fmin, duration, sampling_frequency
         )
         if dmax is None:
+            example_injection_parameter = get_example_injpara(source_type)
+            horizon = find_horizon(
+                ifos, waveform_generator, example_injection_parameter
+            )
+            if source_type in ['BNS', 'NSBH']:
+                horizon = horizon * 0.6  # get more high SNR samples for fitting
+            logger.debug(
+                f"Warning: Max luminosity distance is not provided. Using {horizon}Mpc."
+            )
             samples = get_fitting_source_para_sample(
-                source_type=source_type, Nsample=Nsample
+                source_type=source_type, Nsample=Nsample, dmax=horizon
             )
         else:
             samples = get_fitting_source_para_sample(
@@ -159,11 +166,11 @@ class Seal:
             source_type=source_type,
         )
 
-        print("Computing SNR...")
+        logger.debug("Computing SNR...")
         with Pool(ncpu) as p:
             p.map(partial_work, range(Nsample))
 
-        print("Fitting mu-sigma-SNR relation...")
+        logger.debug("Fitting mu-sigma-SNR relation...")
         # Calculate Aij
         # ['chirp_mass','mass_ratio','a_1','a_2','tilt_1','tilt_2','phi_12','phi_jl',
         #        'iota','psi','phase','ra','dec','luminosity_distance','geocent_time']
@@ -182,7 +189,9 @@ class Seal:
         if low_snr_cutoff is None:
             low_snr_cutoff = 9
         snr_steps = np.arange(low_snr_cutoff, high_snr_cutoff, 2)
-        a, b, c, d, mu_list, sigma_list = fitting_abcd(simulation_result, snr_steps)
+        a, b, c, d, mu_list, sigma_list = fitting_abcd(
+            simulation_result, snr_steps, source_type
+        )
 
         self.prior_coef_a = a
         self.prior_coef_b = b
@@ -198,7 +207,7 @@ class Seal:
             self.description += det_name_list[i] + " "
 
         self.initialized = True
-        print("Fitting done!\na = {}\nb = {}\nc = {}\nd = {}".format(a, b, c, d))
+        logger.debug(f"Fitting done!\na = {a}\nb = {b}\nc = {c}\nd = {d}")
 
         return simulation_result
 
@@ -316,19 +325,8 @@ class Seal:
         source_type,
     ):
         injection_parameters = zip_injection_parameters(samples[sample_ID], source_type)
-        ifos = bilby.gw.detector.InterferometerList(det_name_list)
 
-        # set detector paramaters
-        for i in range(len(ifos)):
-            det = ifos[i]
-            det.duration = duration
-            det.sampling_frequency = sampling_frequency
-            # psd_file = 'psd/{}/{}_psd.txt'.format(psd_label, det_name_list[i])
-            if custom_psd_path:  # otherwise auto-set by bilby
-                psd_file = custom_psd_path[i]
-                psd = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
-                det.power_spectral_density = psd
-
+        ifos = get_ifos(det_name_list, duration, sampling_frequency, custom_psd_path)
         ifos.set_strain_data_from_power_spectral_densities(
             sampling_frequency=sampling_frequency,
             duration=duration,
@@ -421,12 +419,22 @@ class Seal:
                     "Number of PSDs does not match with number of detectors."
                 )
 
+        ifos = get_ifos(det_name_list, duration, sampling_frequency, custom_psd_path)
         # waveform generator and samples
         waveform_generator = get_wave_gen(
             source_type, fmin, duration, sampling_frequency
         )
-        print("Generating source parameters...")
-        samples = get_fitting_source_para_sample(source_type, Nsample)
+        logger.debug("Generating source parameters...")
+        example_injection_parameter = get_example_injpara(source_type)
+        horizon = find_horizon(ifos, waveform_generator, example_injection_parameter)
+        logger.debug(
+            "Warning: Max luminosity distance is not provided. Using {}Mpc.".format(
+                horizon
+            )
+        )
+        samples = get_fitting_source_para_sample(
+            source_type=source_type, Nsample=Nsample, dmax=horizon
+        )
 
         manager = multiprocessing.Manager()
         Ncol = 6  # SNR, 50, 90, search, percentage, timecost
@@ -445,14 +453,14 @@ class Seal:
             source_type=source_type,
         )
 
-        print("Localizing for them...")
+        logger.debug("Localizing them...")
         with Pool(ncpu) as p:
             p.map(partial_work, range(Nsample))
 
-        print("Done!")
+        logger.debug("Done!")
         result_reshaped = np.reshape(catalog_test_results, (Nsample, Ncol))
         np.savetxt(save_filename, result_reshaped)
-        print("Result file saved to ", save_filename)
+        logger.debug("Result file saved to ", save_filename)
 
         return result_reshaped
 

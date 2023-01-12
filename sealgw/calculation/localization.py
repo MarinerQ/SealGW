@@ -69,21 +69,21 @@ def extract_info_from_xml(filepath, return_names=False):
     snr_array = np.array([])
     time_array = np.array([])
 
-    # i=0
+    postcoh = xmlfile["tables"]["postcoh"]
+    trigger_time = 0
     for det in det_names:
-        deff_array = np.append(deff_array, xmlfile["tables"]["postcoh"]["deff_" + det])
-        max_snr_array = np.append(
-            max_snr_array, xmlfile["tables"]["postcoh"]["snglsnr_" + det]
-        )
+        deff_array = np.append(deff_array, postcoh[f"deff_{det}"])
+        max_snr_array = np.append(max_snr_array, [f"snglsnr_{det}"])
         snr_array = np.append(snr_array, xmlfile["snrs"][det])
         time_array = np.append(time_array, xmlfile["snrs"][det].index.values)
         ntimes_array = np.append(ntimes_array, len(xmlfile["snrs"][det]))
         det_code_array = np.append(det_code_array, int(LAL_DET_MAP[det]))
 
-    sigma_array = deff_array * max_snr_array
+        trigger_time += postcoh[f'end_time_sngl_{det}'].item()
+        trigger_time += postcoh[f'end_time_ns_sngl_{det}'].item() * 1e-9
 
-    trigger_time = xmlfile["tables"]["postcoh"]["end_time"].item()
-    trigger_time += xmlfile["tables"]["postcoh"]["end_time_ns"].item() * 1e-9
+    sigma_array = deff_array * max_snr_array
+    trigger_time = trigger_time / len(det_names)  # mean of trigger times of each det
 
     logger.debug("xml processing done. ")
     logger.debug(f"Trigger time: {trigger_time}")
@@ -283,7 +283,7 @@ def plot_skymap(
         skymap,
         contours=[50, 90],
         ground_truth=ground_truth,
-        colorbar=True,
+        colorbar=False,
         figsize=(10, 6),
         inset_kwargs=inset_kwargs,
     )

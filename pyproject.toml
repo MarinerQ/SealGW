@@ -1,0 +1,8 @@
+[tool.black]
+skip-string-normalization = true
+
+[tool.isort]
+profile = "black"
+
+[build-system]
+requires = ["setuptools", "wheel", "Cython", "numpy"]

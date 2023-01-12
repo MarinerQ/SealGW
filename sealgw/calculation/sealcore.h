@@ -65,7 +65,7 @@ static void gsl_matrix_mult(const gsl_matrix *A, const gsl_matrix *B, gsl_matrix
 {
 	unsigned long i,j,k;
 	double data=0;
-	
+
 	if(A->size2 != B->size1){
 		printf("A and B do not fit! \n");
 		exit(-2);
@@ -135,11 +135,11 @@ double complex interpolate_time_series(COMPLEX16TimeSeries *lal_array, double ti
 		imag = cimag(lal_array->data->data[index])*(1-diff) + cimag(lal_array->data->data[index+1])*diff;
 		int_data = real+I*imag;
 	}
-	else if(interp_order == 2) 
+	else if(interp_order == 2)
 	{ // quadratic interpolation
 		double complex y_1,y_2,y_3;
 		double x;
-		
+
 		if(diff<0.5)
 		{
 			x = diff;
@@ -163,7 +163,7 @@ double complex interpolate_time_series(COMPLEX16TimeSeries *lal_array, double ti
 		printf("Wrong interp order!\n");
 		exit(-1);
 	}
-	
+
 	return int_data;
 }
 
@@ -249,7 +249,7 @@ static double complex quadratic_interpolate_time_series(time_series* timeseries,
 	double diff = (time-start_time)/delta_t-(double)index;
 	double complex y_1,y_2,y_3;
 	double x;
-	
+
 	if(diff<0.5){
 		x = diff;
 		y_1 = timeseries->data[index-1];
@@ -382,7 +382,7 @@ double et_resp_func(double ra, double dec, double gpstime, double psi, int detco
 	{
 		return fcross;
 	}
-	
+
 }
 
 double testfunc1(double ra, double dec, double gpstime, int detcode){
@@ -415,7 +415,7 @@ COMPLEX16TimeSeries ** CreateCOMPLEX16TimeSeriesList(const double *time_arrays, 
 	LIGOTimeGPS epoch;
     COMPLEX16TimeSeries **lalsnr_array = (COMPLEX16TimeSeries**)malloc(sizeof(COMPLEX16TimeSeries*)*ndet);
 	double start_time, deltat;
-	
+
 	previous_ntime=0;
 	for ( i = 0; i < ndet; i++)
 	{
@@ -444,29 +444,29 @@ void DestroyCOMPLEX16TimeSeriesList(COMPLEX16TimeSeries **lalsnr_array, int ndet
 }
 
 /*
-Coherent localization skymap with bimodal correlated-digonal prior. 
+Coherent localization skymap with bimodal correlated-digonal prior.
 See arXiv:2110.01874.
 */
 void coherent_skymap_bicorr(
 				double *coh_skymap_bicorr, // The probability skymap we want to return
-				const double *time_arrays, 
-				const double complex *snr_arrays, 
-				const int *detector_codes, 
-				const double *sigmas, 
+				const double *time_arrays,
+				const double complex *snr_arrays,
+				const int *detector_codes,
+				const double *sigmas,
 				const int *ntimes,
 				const int Ndet,
-				const double *ra_grids, 
-				const double *dec_grids, 
-				const int ngrid, 
-				const double start_time, 
-				const double end_time, 
+				const double *ra_grids,
+				const double *dec_grids,
+				const int ngrid,
+				const double start_time,
+				const double end_time,
 				const int ntime_interp,
                 const double prior_mu,
                 const double prior_sigma,
 				const int nthread)
 {
 	int grid_id,time_id,det_id;
-	
+
 	double dt = (end_time-start_time)/ntime_interp;
 	double ref_gps_time = (start_time + end_time)/2.0;
 
@@ -487,12 +487,12 @@ void coherent_skymap_bicorr(
 	double xi = 1/sigma_multimodal/sigma_multimodal;
 	double alpha = mu_multimodal*xi;
 
-	
-	#pragma omp parallel num_threads(nthread) private(time_id,det_id)  shared(coh_skymap_bicorr,snr_list,detectors) 
+
+	#pragma omp parallel num_threads(nthread) private(time_id,det_id)  shared(coh_skymap_bicorr,snr_list,detectors)
 	{
-	#pragma omp for 
+	#pragma omp for
 	for(grid_id=0;grid_id<ngrid;grid_id+=1){
-		double Gsigma[2*Ndet];  
+		double Gsigma[2*Ndet];
 		gsl_matrix *detector_real_streams = gsl_matrix_calloc(ntime_interp,Ndet);
 		gsl_matrix *detector_imag_streams = gsl_matrix_calloc(ntime_interp,Ndet);
 
@@ -503,7 +503,7 @@ void coherent_skymap_bicorr(
 
 		gsl_matrix *J_real_streams   = gsl_matrix_calloc(ntime_interp,2);
 		gsl_matrix *J_imag_streams   = gsl_matrix_calloc(ntime_interp,2);
-		
+
 		//set parameters
 		double ra  = ra_grids[grid_id];
 		double dec = dec_grids[grid_id];
@@ -518,7 +518,7 @@ void coherent_skymap_bicorr(
 				gsl_matrix_set(detector_imag_streams,time_id,det_id,cimag(data));
 			}
 		}
-		
+
 		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
 		//Calculate M
 		double temp_element;
@@ -552,7 +552,7 @@ void coherent_skymap_bicorr(
         M0_inverse_12 = 0.0;
         M0_inverse_21 = 0.0;
         M0_inverse_22 = 1.0/dd0;
-		
+
 		//transform mf data to j stream
 		for(time_id=0;time_id<ntime_interp;time_id++){
 			double temp0_real=0;
@@ -579,16 +579,16 @@ void coherent_skymap_bicorr(
 		double log_prob_margT_bicorr=-100;
 		double prefactor = log(detMprime);
 		double prefactor0 = log(detM0prime);
-		
+
 		coh_skymap_bicorr[grid_id]=0;
-		
+
 		// numerical time marginalization
 		for(time_id=0;time_id<ntime_interp;time_id++){
 			j_r1 = gsl_matrix_get(J_real_streams,time_id,0);
 			j_r2 = gsl_matrix_get(J_real_streams,time_id,1);
 			j_i1 = gsl_matrix_get(J_imag_streams,time_id,0);
 			j_i2 = gsl_matrix_get(J_imag_streams,time_id,1);
-			
+
 			// avoid big number, use log
 			log_exp_term1 = logsumexp4(
 				quadratic_form(j_r1+j_i2+alpha,j_r2+j_i1+alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
@@ -618,13 +618,13 @@ void coherent_skymap_bicorr(
 				quadratic_form(j_r1-j_i2+alpha,j_r2-j_i1-alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
 				quadratic_form(j_r1-j_i2-alpha,j_r2-j_i1-alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2
 			) - prefactor/2;
-			
+
 			log_exp_term = logsumexp4(log_exp_term1,log_exp_term2,log_exp_term3,log_exp_term4);
 			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term);
 		}
-		
+
 		coh_skymap_bicorr[grid_id] = log_prob_margT_bicorr;
-		
+
 		// clean
 		gsl_matrix_free(detector_real_streams);
 		gsl_matrix_free(detector_imag_streams);
@@ -633,11 +633,11 @@ void coherent_skymap_bicorr(
 		gsl_matrix_free(G_sigma_transpose);
 		gsl_matrix_free(J_real_streams);
 		gsl_matrix_free(J_imag_streams);
-		
-	
+
+
 	} // end of for(grid_id)
 	} // end of omp
 
 	DestroyCOMPLEX16TimeSeriesList(snr_list,Ndet);
-	
+
 }

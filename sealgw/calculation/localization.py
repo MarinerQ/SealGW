@@ -1,6 +1,6 @@
 import ctypes
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional, Sequence, Union
 
 import astropy_healpix as ah
 import healpy as hp
@@ -266,6 +266,7 @@ def plot_skymap(
     save_filename: Optional[str] = None,
     true_ra: float = None,
     true_dec: float = None,
+    inset_kwargs: Optional[Union[Dict[str, Any], Sequence[Dict[str, Any]]]] = None,
 ) -> Figure:
     """Plots a localisation skymap using from a log probability density array."""
     import spiir.search.skymap
@@ -276,7 +277,7 @@ def plot_skymap(
     # add ground truth marker if both ra and dec are not None
     ground_truth = None
     if true_ra is not None and true_dec is not None:
-        ground_truth = (true_ra, true_dec)
+        ground_truth = SkyCoord(true_ra, true_dec, unit="rad")
 
     fig = spiir.search.skymap.plot_skymap(
         skymap,
@@ -284,10 +285,8 @@ def plot_skymap(
         ground_truth=ground_truth,
         colorbar=True,
         figsize=(10, 6),
+        inset_kwargs=inset_kwargs,
     )
-
-    if additional_text:
-        ax.text(0, 1, additional_text, transform=ax.transAxes, ha='left')
 
     if save_filename is not None:
         fig.savefig(save_filename)

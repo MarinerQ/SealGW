@@ -14,13 +14,13 @@ from .calculation.localization import (
     get_det_code_array,
     seal_with_adaptive_healpix,
 )
-from .simulation.generating_data import snr_generator, zip_injection_parameters
-from .simulation.prior_fitting import (
-    fitting_abcd,
+from .simulation.generating_data import (
     get_fitting_source_para_sample,
     get_wave_gen,
-    para_conversion,
+    snr_generator,
+    zip_injection_parameters,
 )
+from .simulation.prior_fitting import fitting_abcd, para_conversion
 
 
 class Seal:

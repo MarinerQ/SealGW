@@ -1,0 +1,1 @@
+{"description": "Seal trained with bilby PSD for L1 H1 V1 ", "a": 0.00015189625293519172, "b": 0.0029776038705009267, "c": 8.932088359594938e-05, "d": 0.003054001712803971, "premerger_time": 30, "f_low": 10}

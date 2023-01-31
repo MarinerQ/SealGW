@@ -1,3 +1,11 @@
+# User-defined paths
+tmp/
+runs/
+tests/
+
+clean.sh
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -132,11 +140,5 @@ dmypy.json
 
 # outputs
 
-*.out 
+*.out
 .vscode/
-.DS_Store
-
-
-tests/
-
-clean.sh

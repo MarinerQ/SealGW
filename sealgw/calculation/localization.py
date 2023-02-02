@@ -1,6 +1,6 @@
 import ctypes
 import logging
-from typing import Any, Dict, Optional, Sequence, Union
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import astropy_healpix as ah
 import healpy as hp
@@ -13,6 +13,7 @@ from astropy.coordinates import SkyCoord
 from ligo.skymap import postprocess
 from matplotlib import figure as Figure
 from matplotlib import pyplot as plt
+
 
 # export OMP_NUM_THREADS=8
 
@@ -73,7 +74,7 @@ def extract_info_from_xml(filepath, return_names=False):
     trigger_time = 0
     for det in det_names:
         deff_array = np.append(deff_array, postcoh[f"deff_{det}"])
-        max_snr_array = np.append(max_snr_array, [f"snglsnr_{det}"])
+        max_snr_array = np.append(max_snr_array, postcoh[f"snglsnr_{det}"])
         snr_array = np.append(snr_array, xmlfile["snrs"][det])
         time_array = np.append(time_array, xmlfile["snrs"][det].index.values)
         ntimes_array = np.append(ntimes_array, len(xmlfile["snrs"][det]))
@@ -266,7 +267,10 @@ def plot_skymap(
     save_filename: Optional[str] = None,
     true_ra: float = None,
     true_dec: float = None,
-    inset_kwargs: Optional[Union[Dict[str, Any], Sequence[Dict[str, Any]]]] = None,
+    zoomin_truth: bool = False,
+    zoomin_maxprob: bool = False,
+    title: Optional[str] = None,
+    figsize: Tuple[float, float] = (14, 7),
 ) -> Figure:
     """Plots a localisation skymap using from a log probability density array."""
     import spiir.search.skymap
@@ -279,13 +283,22 @@ def plot_skymap(
     if true_ra is not None and true_dec is not None:
         ground_truth = SkyCoord(true_ra, true_dec, unit="rad")
 
+    inset_kwargs = []
+    if zoomin_truth:
+        inset_kwargs.append({'center': ground_truth, 'radius': 5})
+    if zoomin_maxprob:
+        inset_kwargs.append({'center': "max", 'radius': 5})
+    if len(inset_kwargs) == 0:
+        inset_kwargs = None
+
     fig = spiir.search.skymap.plot_skymap(
         skymap,
         contours=[50, 90],
         ground_truth=ground_truth,
         colorbar=False,
-        figsize=(10, 6),
+        figsize=figsize,
         inset_kwargs=inset_kwargs,
+        title=title,
     )
 
     if save_filename is not None:

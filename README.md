@@ -4,17 +4,19 @@ A semi-analytical approach for sky localization of gravitational waves, tested o
 
 ## Installation
 
-0. Environments: [IGWN Conda Distribution](https://computing.docs.ligo.org/conda/environments/) is highly recommended.
+- Environments: [IGWN Conda Distribution](https://computing.docs.ligo.org/conda/environments/) is highly recommended
 
-1. Download (git clone) sealgw and go into its directory.
+- Dependencies: You need to install [SPIIR](https://github.com/tanghyd/spiir) before installing sealgw.
 
-1. <tt> pip install . </tt>
+- Download (git clone) sealgw and go into its directory.
 
-To uninstall:  <tt> pip uninstall sealgw </tt>
+- <tt> pip install . </tt>
+
+- To uninstall:  <tt> pip uninstall sealgw </tt>
 
 ## Usage
 
-See <tt> examples/ </tt> for usage of sealgw.
+See <tt> share/examples/ </tt> for usage of sealgw.
 
 ## TODO
 

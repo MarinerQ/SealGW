@@ -8,6 +8,7 @@ from multiprocessing import Pool
 
 import bilby
 import numpy as np
+import spiir.io
 
 from .calculation.localization import (
     catalog_test_statistics,
@@ -16,12 +17,15 @@ from .calculation.localization import (
     seal_with_adaptive_healpix,
 )
 from .simulation.generating_data import (
+    get_example_injpara,
     get_fitting_source_para_sample,
+    get_ifos,
+    get_inj_paras,
     get_wave_gen,
     snr_generator,
     zip_injection_parameters,
 )
-from .simulation.prior_fitting import fitting_abcd, para_conversion
+from .simulation.prior_fitting import find_horizon, fitting_abcd, para_conversion
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +99,9 @@ class Seal:
     def _calculate_snr_kernel(
         self, sample_ID, samples, ifos, waveform_generator, source_type, results
     ):
-        inj_para = zip_injection_parameters(samples[sample_ID], source_type)
+        inj_para = get_inj_paras(
+            samples[sample_ID], source_type
+        )  # or use zip_injection_parameters
         # inj_para = bilby.gw.conversion.generate_all_bbh_parameters(inj_para)
         h_dict = waveform_generator.frequency_domain_strain(parameters=inj_para)
 
@@ -324,13 +330,24 @@ class Seal:
         nthread,
         source_type,
     ):
-        injection_parameters = zip_injection_parameters(samples[sample_ID], source_type)
+        injection_parameters = get_inj_paras(samples[sample_ID], source_type)
+        ifos = bilby.gw.detector.InterferometerList(det_name_list)
 
-        ifos = get_ifos(det_name_list, duration, sampling_frequency, custom_psd_path)
+        # set detector paramaters
+        for i in range(len(ifos)):
+            det = ifos[i]
+            det.duration = duration
+            det.sampling_frequency = sampling_frequency
+            # psd_file = 'psd/{}/{}_psd.txt'.format(psd_label, det_name_list[i])
+            if custom_psd_path:  # otherwise auto-set by bilby
+                psd_file = custom_psd_path[i]
+                psd = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
+                det.power_spectral_density = psd
+
         ifos.set_strain_data_from_power_spectral_densities(
             sampling_frequency=sampling_frequency,
             duration=duration,
-            start_time=injection_parameters["geocent_time"] - duration + 1,
+            start_time=injection_parameters['geocent_time'] - duration + 1,
         )
 
         ifos.inject_signal(
@@ -359,12 +376,16 @@ class Seal:
         else:
             sigma_array = np.array(sigma_list)
 
-            time_arrays = np.array([snr.sample_times.data for snr in snr_list])
-            snr_arrays = np.array([snr.data for snr in snr_list])
-            ntimes_array = np.array([len(snr.sample_times.data) for snr in snr_list])
+            time_arrays = np.array([])
+            snr_arrays = np.array([])
+            ntimes_array = np.array([])
+            for snr in snr_list:
+                snr_arrays = np.append(snr_arrays, snr.data)
+                time_arrays = np.append(time_arrays, snr.sample_times.data)
+                ntimes_array = np.append(ntimes_array, len(snr.sample_times.data))
 
-            start_time = injection_parameters["geocent_time"] - 0.01
-            end_time = injection_parameters["geocent_time"] + 0.01
+            start_time = injection_parameters['geocent_time'] - 0.01
+            end_time = injection_parameters['geocent_time'] + 0.01
 
             logprob_skymap, timecost = self.localize(
                 det_name_list,
@@ -379,8 +400,8 @@ class Seal:
                 timecost=True,
             )
 
-            true_ra = injection_parameters["ra"]
-            true_dec = injection_parameters["dec"]
+            true_ra = injection_parameters['ra']
+            true_dec = injection_parameters['dec']
             confidence_areas, search_area, percentage = catalog_test_statistics(
                 logprob_skymap, true_ra, true_dec
             )
@@ -406,12 +427,12 @@ class Seal:
         use_bilby_psd=True,
         custom_psd_path=None,
     ):
-        if not self.initialized:
+        if self.initialized == False:
             raise Exception("Seal not initialized!")
 
         if use_bilby_psd and custom_psd_path:
             raise Exception(
-                "You can use only one of them: bilby PSD or your own PSD. Disable one."
+                "You can use only one of them: bilby PSD or your own PSD. Disable one of them. "
             )
         if custom_psd_path:
             if len(custom_psd_path) != len(det_name_list):
@@ -419,22 +440,12 @@ class Seal:
                     "Number of PSDs does not match with number of detectors."
                 )
 
-        ifos = get_ifos(det_name_list, duration, sampling_frequency, custom_psd_path)
         # waveform generator and samples
         waveform_generator = get_wave_gen(
             source_type, fmin, duration, sampling_frequency
         )
-        logger.debug("Generating source parameters...")
-        example_injection_parameter = get_example_injpara(source_type)
-        horizon = find_horizon(ifos, waveform_generator, example_injection_parameter)
-        logger.debug(
-            "Warning: Max luminosity distance is not provided. Using {}Mpc.".format(
-                horizon
-            )
-        )
-        samples = get_fitting_source_para_sample(
-            source_type=source_type, Nsample=Nsample, dmax=horizon
-        )
+        print("Generating source parameters...")
+        samples = get_fitting_source_para_sample(source_type, Nsample)
 
         manager = multiprocessing.Manager()
         Ncol = 6  # SNR, 50, 90, search, percentage, timecost
@@ -453,14 +464,14 @@ class Seal:
             source_type=source_type,
         )
 
-        logger.debug("Localizing them...")
+        print("Localizing for them...")
         with Pool(ncpu) as p:
             p.map(partial_work, range(Nsample))
 
-        logger.debug("Done!")
+        print("Done!")
         result_reshaped = np.reshape(catalog_test_results, (Nsample, Ncol))
         np.savetxt(save_filename, result_reshaped)
-        logger.debug("Result file saved to ", save_filename)
+        print("Result file saved to ", save_filename)
 
         return result_reshaped
 
@@ -511,7 +522,9 @@ class SealBNSEW(Seal):
     def _calculate_snr_kernel(
         self, sample_ID, samples, ifos, waveform_generator, source_type, results
     ):
-        inj_para = zip_injection_parameters(samples[sample_ID], source_type)
+        inj_para = get_inj_paras(
+            samples[sample_ID], source_type
+        )  # or use zip_injection_parameters
         # inj_para = bilby.gw.conversion.generate_all_bns_parameters(inj_para)
         inj_para['premerger_time'] = self.premerger_time
         inj_para['flow'] = self.f_low

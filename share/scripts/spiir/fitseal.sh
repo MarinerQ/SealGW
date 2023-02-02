@@ -14,7 +14,7 @@ out_dir="seal_training_outputs/"
 
 # For test (O2 PSD): high_snr_cutoff = 31, Nsample=10000
 # For O3/O4: high_snr_cutoff = 35, Nsample=30000
-python fit_sealgw_model \
+python fit_sealgw_model.py \
     ${ifostr} \
     ${psd_path} \
     ${out_dir} \

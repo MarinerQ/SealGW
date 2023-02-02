@@ -16,10 +16,16 @@ def select_aij_according_to_snr(file, low, high):
     selected_a22 = file[np.where((file[:, 0] >= low) * (file[:, 1] < high))][:, 4]
 
     # put aij together
-    return np.array([selected_a11, selected_a12, selected_a21, selected_a22])
+    alist = np.array([])
+    alist = np.append(alist, selected_a11)
+    alist = np.append(alist, selected_a12)
+    alist = np.append(alist, selected_a21)
+    alist = np.append(alist, selected_a22)
+    return np.array(alist)
+    # return np.array([selected_a11, selected_a12, selected_a21, selected_a22])
 
 
-def f(x, mu, sigma):
+def normalizedgaussian(x, mu, sigma):
     # Normalized Gaussian PDF
     return np.exp(-((x - mu) ** 2) / 2 / sigma**2) / np.sqrt(2 * np.pi) / sigma
 
@@ -41,7 +47,7 @@ def error_v1new(paras, x, n_i):
     paras = [mu,sigma]
     """
     mu, sigma = paras
-    ff = (f(x, mu, sigma) + f(x, -mu, sigma)) / 2
+    ff = (normalizedgaussian(x, mu, sigma) + normalizedgaussian(x, -mu, sigma)) / 2
     return ff - n_i
 
 
@@ -49,11 +55,11 @@ def bins_to_center_values(bins):
     return np.array([((bins[i] + bins[i + 1]) / 2) for i in range(0, len(bins) - 1)])
 
 
-def ls_fit_bi(snr, samples):  # fit 2 Gaussian prior
+def ls_fit_bi(snr, samples, source_type):  # fit 2 Gaussian prior
     # TODO: histograms should be computed with numpy instead of matplotlib
     n, bins, patches = plt.hist(samples, bins="auto", density=True)
     x = bins_to_center_values(bins)
-    mu_init, sigma_init = initial_estimate(snr)
+    mu_init, sigma_init = initial_estimate(snr, source_type)
     paras0 = [mu_init, sigma_init]
     paras_fitted = leastsq(error_v1new, paras0, args=(x, n))[0]
     return paras_fitted
@@ -105,7 +111,7 @@ def fitting_abcd(simulation_result, snr_steps, source_type="BNS"):
 
         paras_fit = ls_fit_bi(snr_step, Aijs, source_type)
         plt.clf()
-        mu_list.append(paras_fit[0])
+        mu_list.append(abs(paras_fit[0]))
         sigma_list.append(paras_fit[1])
 
     a, b = np.polyfit(snr_steps, mu_list, 1)
@@ -131,8 +137,10 @@ def linear_fitting_plot(
     fig, ax = plt.subplots(figsize=(10, 7.5))
 
     # plt.text(7.8, 9.5, r'x 10$^{-3}$',fontsize=16)
-    ax.set_yticks(size=ticksize)
-    ax.set_xticks(size=ticksize)
+    # ax.set_yticks(size=ticksize)
+    # ax.set_xticks(size=ticksize)
+    plt.yticks(size=ticksize)
+    plt.xticks(size=ticksize)
     ax.scatter(
         snr_steps,
         1e3 * np.array(mu_list),
@@ -187,14 +195,19 @@ def bimodal_fitting_plot(
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
     for i in range(len(test_snr_low)):
         ax = axes[i // ncols, i % ncols]
-        ax.set_yticks(size=ticksize)
-        ax.set_xticks(size=ticksize)
+        # ax.set_yticks(size=ticksize)
+        # ax.set_xticks(size=ticksize)
+        plt.yticks(size=ticksize)
+        plt.xticks(size=ticksize)
         snr_low = test_snr_low[i]
         snr_high = test_snr_high[i]
         snr_middle = (snr_high + snr_low) / 2
         mu = a * snr_middle + b
         sigma = c * snr_middle + b
-        theo_pdf = (f(A_range, mu, sigma) + f(A_range, -mu, sigma)) / 2
+        theo_pdf = (
+            normalizedgaussian(A_range, mu, sigma)
+            + normalizedgaussian(A_range, -mu, sigma)
+        ) / 2
         ax.hist(
             select_aij_according_to_snr(result, snr_low, snr_high),
             bins='auto',

@@ -42,7 +42,7 @@ def main(
     seallist = []
 
     for source_type in source_types:
-        print("\nTraining {} seal model...".format(source_type))
+        print(f"\nTraining {source_type} seal model...")
         seal2train = seal.Seal()
 
         # fitting
@@ -56,21 +56,17 @@ def main(
             low_snr_cutoff=low_snr_cutoff,
             high_snr_cutoff=high_snr_cutoff,
         )
-
+        
         # make fitting plots
         snr_steps = np.arange(low_snr_cutoff, high_snr_cutoff, 2)
         a, b, c, d, mu_list, sigma_list = sealsim.prior_fitting.fitting_abcd(
             fitting_samples, snr_steps, source_type
         )
-        linear_fitting_plot_filename = '{}/linear_fitting_{}_{}.png'.format(
-            output_dir, source_type, label
-        )
+        linear_fitting_plot_filename = f'{output_dir}/linear_fitting_{source_type}_{label}.png'
         sealsim.prior_fitting.linear_fitting_plot(
             snr_steps, mu_list, sigma_list, a, b, c, d, linear_fitting_plot_filename
         )
-        bimodal_fitting_plot_filename = '{}/bimodal_fitting_{}_{}.png'.format(
-            output_dir, source_type, label
-        )
+        bimodal_fitting_plot_filename = f'{output_dir}/bimodal_fitting_{source_type}_{label}.png'
         sealsim.prior_fitting.bimodal_fitting_plot(
             fitting_samples,
             a,
@@ -82,11 +78,11 @@ def main(
             save_filename=bimodal_fitting_plot_filename,
         )
 
-        seal2train.description = "Config file for {} {}".format(source_type, label)
+        seal2train.description = f"Config file for {source_type} {label}"
         seallist.append(seal2train)
 
     # save
-    config_filename = '{}/config_{}.json'.format(output_dir, label)
+    config_filename = f'{output_dir}/config_{label}.json'
     sealsim.prior_fitting.save_configs(source_types, label, seallist, config_filename)
 
 

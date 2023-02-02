@@ -169,13 +169,81 @@ def generate_random_inject_paras(
         #        lambda_1, lambda_2, premerger_time, flows]
 
     else:
-        raise Exception('Source type error!')
+        # raise Exception('Source type error!')
+        pass
 
     return np.stack(parameter_arrays, axis=1)
 
 
 def zip_injection_parameters(values, source_type, names=None):
     return dict(zip(names or PARAMETERS[source_type], values))
+
+
+def get_inj_paras(
+    parameter_values,
+    source_type,
+    parameter_names=[
+        'chirp_mass',
+        'mass_ratio',
+        'a_1',
+        'a_2',
+        'tilt_1',
+        'tilt_2',
+        'phi_12',
+        'phi_jl',
+        'theta_jn',
+        'psi',
+        'phase',
+        'ra',
+        'dec',
+        'luminosity_distance',
+        'geocent_time',
+    ],
+):
+    inj_paras = dict()
+    if source_type in ['BNS', 'NSBH']:
+        parameter_names = [
+            'chirp_mass',
+            'mass_ratio',
+            'a_1',
+            'a_2',
+            'tilt_1',
+            'tilt_2',
+            'phi_12',
+            'phi_jl',
+            'theta_jn',
+            'psi',
+            'phase',
+            'ra',
+            'dec',
+            'luminosity_distance',
+            'geocent_time',
+            'lambda_1',
+            'lambda_2',
+        ]
+    elif source_type in ['BNS_EW_FD', 'BNS_EW_TD']:
+        parameter_names = [
+            'chirp_mass',
+            'mass_ratio',
+            'a_1',
+            'a_2',
+            'tilt_1',
+            'tilt_2',
+            'phi_12',
+            'phi_jl',
+            'theta_jn',
+            'psi',
+            'phase',
+            'ra',
+            'dec',
+            'luminosity_distance',
+            'geocent_time',
+            'lambda_1',
+            'lambda_2',
+        ]
+    for i in range(len(parameter_names)):
+        inj_paras[parameter_names[i]] = parameter_values[i]
+    return inj_paras
 
 
 def premerger_time_to_freq(pre_t, m1, m2):

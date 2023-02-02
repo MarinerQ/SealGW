@@ -7,13 +7,13 @@ import healpy as hp
 import ligo.skymap.plot
 import numpy as np
 import scipy
+import sealcore
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from ligo.skymap import postprocess
 from matplotlib import figure as Figure
 from matplotlib import pyplot as plt
 
-import sealcore
 
 # export OMP_NUM_THREADS=8
 

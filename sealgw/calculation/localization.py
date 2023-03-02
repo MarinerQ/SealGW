@@ -158,6 +158,7 @@ def seal_with_adaptive_healpix(
     prior_mu,
     prior_sigma,
     nthread,
+    interp_order=0,
 ):
 
     # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
@@ -216,6 +217,7 @@ def seal_with_adaptive_healpix(
             prior_mu,
             prior_sigma,
             nthread,
+            interp_order,
         )
 
         # Update skymap

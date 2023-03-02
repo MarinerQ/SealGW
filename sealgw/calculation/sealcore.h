@@ -463,7 +463,8 @@ void coherent_skymap_bicorr(
 				const int ntime_interp,
                 const double prior_mu,
                 const double prior_sigma,
-				const int nthread)
+				const int nthread,
+				const int interp_order)
 {
 	int grid_id,time_id,det_id;
 
@@ -513,7 +514,7 @@ void coherent_skymap_bicorr(
 		for(det_id=0;det_id<Ndet;det_id++){
 			double time_shift = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time);
 			for(time_id=0;time_id<ntime_interp;time_id++){
-				double complex data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, 0);
+				double complex data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
 				gsl_matrix_set(detector_real_streams,time_id,det_id,creal(data));
 				gsl_matrix_set(detector_imag_streams,time_id,det_id,cimag(data));
 			}

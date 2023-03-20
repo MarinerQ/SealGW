@@ -31,7 +31,8 @@ cdef extern from "sealcore.h":
 				const int ntime_interp,
                 const double prior_mu,
                 const double prior_sigma,
-				const int nthread);
+				const int nthread,
+				const int interp_order);
 
 
 def Pycoherent_skymap_bicorr(
@@ -50,7 +51,8 @@ def Pycoherent_skymap_bicorr(
 				int ntime_interp,
                 double prior_mu,
                 double prior_sigma,
-				int nthread): # 'arr' is a one-dimensional numpy array
+				int nthread,
+				int interp_order): # 'arr' is a one-dimensional numpy array
 
     #if not coh_skymap_bicorr.flags['C_CONTIGUOUS']:
 	# Makes a contiguous copy of the numpy array.
@@ -74,7 +76,8 @@ def Pycoherent_skymap_bicorr(
 			ntime_interp,
 			prior_mu,
 			prior_sigma,
-			nthread
+			nthread,
+			interp_order
 	)
 
     return coh_skymap_bicorr

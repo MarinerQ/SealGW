@@ -168,108 +168,6 @@ double complex interpolate_time_series(COMPLEX16TimeSeries *lal_array, double ti
 }
 
 
-/*
-static double complex step_interpolate_time_series(time_series* timeseries, double time)
-{
-	double start_time = timeseries->start_time;
-	//printf("timeseries start time: %f", timeseries->start_time);
-	//printf("timeseries npoint: %f", timeseries->npoint);
-	//printf("timeseries delta t: %f", timeseries->delta_t);
-	double end_time   = timeseries->start_time + timeseries->npoint*timeseries->delta_t;
-	double delta_t    = timeseries->delta_t;
-
-	if(time < start_time){
-		printf("interpolate time can not smaller than the start time of time series!\n");
-		exit(-1);
-	}
-	else if(time > end_time){
-		//printf("%f > %f\n", time, end_time);
-		printf("interpolate time can not larger than the end time of time series!\n");
-		exit(-1);
-	}
-
-	int index = (int)((time-start_time)/delta_t);
-	double diff = (time-start_time)/delta_t-(double)index;
-	double complex int_data;
-	if(diff<0.5){
-		double real = creal(timeseries->data[index]);
-		double imag = cimag(timeseries->data[index]);
-		int_data = real+I*imag;
-	}
-	else{
-		double real = creal(timeseries->data[index+1]);
-		double imag = cimag(timeseries->data[index+1]);
-		int_data = real+I*imag;
-	}
-
-	return int_data;
-}
-
-
-static double complex linear_interpolate_time_series(time_series* timeseries, double time)
-{
-	double start_time = timeseries->start_time;
-	double end_time   = timeseries->start_time + timeseries->npoint*timeseries->delta_t;
-	double delta_t    = timeseries->delta_t;
-
-	if(time < start_time){
-		printf("interpolate time can not smaller than the start time of time series!\n");
-		exit(-1);
-	}
-	else if(time > end_time){
-		printf("interpolate time can not larger than the end time of time series!\n");
-		exit(-1);
-	}
-
-	int index = (int)((time-start_time)/delta_t);
-	double diff = (time-start_time)/delta_t-(double)index;
-	double real = creal(timeseries->data[index])*(1-diff) + creal(timeseries->data[index+1])*diff;
-	double imag = cimag(timeseries->data[index])*(1-diff) + cimag(timeseries->data[index+1])*diff;
-	double complex int_data = real+I*imag;
-
-	return int_data;
-}
-
-static double complex quadratic_interpolate_time_series(time_series* timeseries, double time)
-{
-	double start_time = timeseries->start_time;
-	double end_time   = timeseries->start_time + timeseries->npoint*timeseries->delta_t;
-	double delta_t    = timeseries->delta_t;
-
-	if(time < start_time){
-		printf("interpolate time can not smaller than the start time of time series!\n");
-		exit(-1);
-	}
-	else if(time > end_time){
-		printf("interpolate time can not larger than the end time of time series!\n");
-		exit(-1);
-	}
-
-	int index = (int)((time-start_time)/delta_t);
-	double diff = (time-start_time)/delta_t-(double)index;
-	double complex y_1,y_2,y_3;
-	double x;
-
-	if(diff<0.5){
-		x = diff;
-		y_1 = timeseries->data[index-1];
-		y_2 = timeseries->data[index];
-		y_3 = timeseries->data[index+1];
-	}
-	else{
-		x = 1 - diff;
-		y_1 = timeseries->data[index];
-		y_2 = timeseries->data[index+1];
-		y_3 = timeseries->data[index+2];
-	}
-
-	double real = creal(y_1)*x*(x-1.0)/(2.0) + creal(y_2)*(x+1.0)*(x-1.0)/(-1.0) + creal(y_3)*(x+1)*x/(2.0);
-	double imag = cimag(y_1)*x*(x-1.0)/(2.0) + cimag(y_2)*(x+1.0)*(x-1.0)/(-1.0) + cimag(y_3)*(x+1)*x/(2.0);
-	double int_data = real+I*imag;
-
-	return int_data;
-}
-*/
 
 static void ComputeDetAMResponse(
 		double *fplus,          /**< Returned value of F+ */
@@ -345,19 +243,70 @@ static void getGsigma_matrix(const LALDetector *detectors,const double *sigma, i
 	int i;
 	double Gpc[2];
 
-	if(detectors==NULL){
-		printf("You need to create the detector first! \n");
-	}
-	else if(sigma==NULL){
-		printf("You need to assign the value to sigma! \n");
-	}
-
 	for(i=0;i<Ndet;i++){
 		getGpc(detectors[i],ra,dec,gps_time,Gpc);
 		Gsigma[i*2]   = Gpc[0]*sigma[i];
 		Gsigma[i*2+1] = Gpc[1]*sigma[i];
 	}
 
+}
+
+static void calcM(const double *Gsigma, int Ndet, double *M){
+	/* M = Gsigma^T * Gsigma, where Gsigma is a Ndetx2 matrix, M is a 2x2 matrix. */
+	int i,j,k;
+	double sum;
+
+	for(i=0; i<2; i++){
+		for(j=0; j<2; j++)
+		{
+			sum=0;
+			for(k=0; k<Ndet; k++){
+				sum += Gsigma[k*2+i]*Gsigma[k*2+j];
+			}
+			M[2*i+j] = sum;
+		}
+	}
+}
+
+double calcExpterm(double j_r1, double j_r2,double j_i1, double j_i2,
+				  double alpha, double prefactor, double prefactor0,
+				  double M_inverse_11, double M_inverse_12, double M_inverse_21, double M_inverse_22,
+				  double M0_inverse_11, double M0_inverse_12, double M0_inverse_21, double M0_inverse_22)
+{
+	double log_exp_term, log_exp_term1,log_exp_term2,log_exp_term3,log_exp_term4;
+
+	log_exp_term1 = logsumexp4(
+		quadratic_form(j_r1+j_i2+alpha,j_r2+j_i1+alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
+		quadratic_form(j_r1+j_i2-alpha,j_r2+j_i1+alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
+		quadratic_form(j_r1+j_i2+alpha,j_r2+j_i1-alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
+		quadratic_form(j_r1+j_i2-alpha,j_r2+j_i1-alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2
+	) - prefactor/2;
+
+
+	log_exp_term2 = logsumexp4(
+		quadratic_form(j_r1+j_i2+alpha,j_r2-j_i1+alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
+		quadratic_form(j_r1+j_i2-alpha,j_r2-j_i1+alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
+		quadratic_form(j_r1+j_i2+alpha,j_r2-j_i1-alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
+		quadratic_form(j_r1+j_i2-alpha,j_r2-j_i1-alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2
+	) - prefactor0/2;
+
+	log_exp_term3 = logsumexp4(
+		quadratic_form(j_r1-j_i2+alpha,j_r2+j_i1+alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
+		quadratic_form(j_r1-j_i2-alpha,j_r2+j_i1+alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
+		quadratic_form(j_r1-j_i2+alpha,j_r2+j_i1-alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
+		quadratic_form(j_r1-j_i2-alpha,j_r2+j_i1-alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2
+	) - prefactor0/2;
+
+	log_exp_term4 = logsumexp4(
+		quadratic_form(j_r1-j_i2+alpha,j_r2-j_i1+alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
+		quadratic_form(j_r1-j_i2-alpha,j_r2-j_i1+alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
+		quadratic_form(j_r1-j_i2+alpha,j_r2-j_i1-alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
+		quadratic_form(j_r1-j_i2-alpha,j_r2-j_i1-alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2
+	) - prefactor/2;
+
+	log_exp_term = logsumexp4(log_exp_term1,log_exp_term2,log_exp_term3,log_exp_term4);
+
+	return log_exp_term;
 }
 
 double et_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode){
@@ -443,6 +392,7 @@ void DestroyCOMPLEX16TimeSeriesList(COMPLEX16TimeSeries **lalsnr_array, int ndet
 	}
 }
 
+
 /*
 Coherent localization skymap with bimodal correlated-digonal prior.
 See arXiv:2110.01874.
@@ -463,7 +413,8 @@ void coherent_skymap_bicorr(
 				const int ntime_interp,
                 const double prior_mu,
                 const double prior_sigma,
-				const int nthread)
+				const int nthread,
+				const int interp_order)
 {
 	int grid_id,time_id,det_id;
 
@@ -486,58 +437,28 @@ void coherent_skymap_bicorr(
 	double sigma_multimodal = prior_sigma;
 	double xi = 1/sigma_multimodal/sigma_multimodal;
 	double alpha = mu_multimodal*xi;
-
-
 	#pragma omp parallel num_threads(nthread) private(time_id,det_id)  shared(coh_skymap_bicorr,snr_list,detectors)
 	{
 	#pragma omp for
 	for(grid_id=0;grid_id<ngrid;grid_id+=1){
+		coh_skymap_bicorr[grid_id]=0;
+
 		double Gsigma[2*Ndet];
-		gsl_matrix *detector_real_streams = gsl_matrix_calloc(ntime_interp,Ndet);
-		gsl_matrix *detector_imag_streams = gsl_matrix_calloc(ntime_interp,Ndet);
-
-		gsl_matrix *M_prime = gsl_matrix_alloc(2,2);
-
-		gsl_matrix *G_sigma = gsl_matrix_alloc(Ndet,2); //same as previouly defined
-		gsl_matrix *G_sigma_transpose = gsl_matrix_alloc(2,Ndet);
-
-		gsl_matrix *J_real_streams   = gsl_matrix_calloc(ntime_interp,2);
-		gsl_matrix *J_imag_streams   = gsl_matrix_calloc(ntime_interp,2);
+		double M[4];
 
 		//set parameters
 		double ra  = ra_grids[grid_id];
 		double dec = dec_grids[grid_id];
 
-
-		//time shift the data
-		for(det_id=0;det_id<Ndet;det_id++){
-			double time_shift = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time);
-			for(time_id=0;time_id<ntime_interp;time_id++){
-				double complex data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, 0);
-				gsl_matrix_set(detector_real_streams,time_id,det_id,creal(data));
-				gsl_matrix_set(detector_imag_streams,time_id,det_id,cimag(data));
-			}
-		}
-
 		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
 		//Calculate M
-		double temp_element;
-		int ii,jj;
-		for(ii=0;ii<Ndet;ii++){
-			for(jj=0;jj<2;jj++){
-				temp_element = Gsigma[2*ii+jj];
-				gsl_matrix_set(G_sigma,ii,jj,temp_element);
-				gsl_matrix_set(G_sigma_transpose,jj,ii,temp_element);
-			}
-		}
-		gsl_matrix_mult(G_sigma_transpose,G_sigma,M_prime); //M_prime here is actually M
-
+		calcM(Gsigma, Ndet, M);
 		//Calculate M'^{-1} and M0'^{-1}
         double M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22;
-        double aa = gsl_matrix_get(M_prime,0,0) + gsl_matrix_get(M_prime,1,1) + xi;
-        double bb = 2*gsl_matrix_get(M_prime,0,1);
-        double cc = 2*gsl_matrix_get(M_prime,1,0);
-        double dd = gsl_matrix_get(M_prime,1,1) + gsl_matrix_get(M_prime,0,0) + xi;
+		double aa = M[0] + M[3] + xi;
+        double bb = 2*M[1];
+        double cc = 2*M[2];
+        double dd = M[3] + M[0] + xi;
         double detMprime = aa*dd - bb*cc;
         M_inverse_11 = dd/(aa*dd-bb*cc);
         M_inverse_12 = -cc/(aa*dd-bb*cc);
@@ -545,95 +466,104 @@ void coherent_skymap_bicorr(
         M_inverse_22 = aa/(aa*dd-bb*cc);
 
         double M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22;
-        double aa0 = gsl_matrix_get(M_prime,0,0) + gsl_matrix_get(M_prime,1,1) + xi;
-        double dd0 = gsl_matrix_get(M_prime,1,1) + gsl_matrix_get(M_prime,0,0)+ xi;
+		double aa0 = M[0] + M[3] + xi;
+        double dd0 = aa0;
         double detM0prime = aa0*dd0;
         M0_inverse_11 = 1.0/aa0;
         M0_inverse_12 = 0.0;
         M0_inverse_21 = 0.0;
         M0_inverse_22 = 1.0/dd0;
 
-		//transform mf data to j stream
-		for(time_id=0;time_id<ntime_interp;time_id++){
-			double temp0_real=0;
-			double temp0_imag=0;
-			double temp1_real=0;
-			double temp1_imag=0;
-			for(det_id=0;det_id<Ndet;det_id++){
-				temp0_real += gsl_matrix_get(detector_real_streams,time_id,det_id)*gsl_matrix_get(G_sigma,det_id,0);
-				temp0_imag += gsl_matrix_get(detector_imag_streams,time_id,det_id)*gsl_matrix_get(G_sigma,det_id,0);
-				temp1_real += gsl_matrix_get(detector_real_streams,time_id,det_id)*gsl_matrix_get(G_sigma,det_id,1);
-				temp1_imag += gsl_matrix_get(detector_imag_streams,time_id,det_id)*gsl_matrix_get(G_sigma,det_id,1);
-			}
-			gsl_matrix_set(J_real_streams,time_id,0,temp0_real);
-			gsl_matrix_set(J_imag_streams,time_id,0,temp0_imag);
-			gsl_matrix_set(J_real_streams,time_id,1,temp1_real);
-			gsl_matrix_set(J_imag_streams,time_id,1,temp1_imag);
-		}
-
-
-		//calculate skymap
-		//double snr_temp;
-		double log_exp_term1,log_exp_term2,log_exp_term,log_exp_term3,log_exp_term4;
+		double log_exp_term;
+		double log_exp_term0,log_exp_term1;
 		double j_r1,j_r2,j_i1,j_i2;
+		double j_r1_0,j_r2_0,j_i1_0,j_i2_0,j_r1_1,j_r2_1,j_i1_1,j_i2_1;
+		int time_id_1;
 		double log_prob_margT_bicorr=-100;
 		double prefactor = log(detMprime);
 		double prefactor0 = log(detM0prime);
 
-		coh_skymap_bicorr[grid_id]=0;
+		//transform matched filtering snr to j stream
+		double time_shifts[Ndet];
+		double time_shift;
+		double complex data;
+		double complex data0,data1;
+		for(det_id=0;det_id<Ndet;det_id++){
+			time_shifts[det_id] = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time);
+		}
 
-		// numerical time marginalization
+		// without loop unrolling
 		for(time_id=0;time_id<ntime_interp;time_id++){
-			j_r1 = gsl_matrix_get(J_real_streams,time_id,0);
-			j_r2 = gsl_matrix_get(J_real_streams,time_id,1);
-			j_i1 = gsl_matrix_get(J_imag_streams,time_id,0);
-			j_i2 = gsl_matrix_get(J_imag_streams,time_id,1);
+			j_r1 = 0;
+			j_r2 = 0;
+			j_i1 = 0;
+			j_i2 = 0;
 
-			// avoid big number, use log
-			log_exp_term1 = logsumexp4(
-				quadratic_form(j_r1+j_i2+alpha,j_r2+j_i1+alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
-				quadratic_form(j_r1+j_i2-alpha,j_r2+j_i1+alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
-				quadratic_form(j_r1+j_i2+alpha,j_r2+j_i1-alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
-				quadratic_form(j_r1+j_i2-alpha,j_r2+j_i1-alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2
-			) - prefactor/2;
+			for(det_id=0;det_id<Ndet;det_id++){
+				time_shift = time_shifts[det_id];
+				data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
 
+				j_r1 += creal(data)*Gsigma[2*det_id];
+				j_i1 += cimag(data)*Gsigma[2*det_id];
+				j_r2 += creal(data)*Gsigma[2*det_id+1];
+				j_i2 += cimag(data)*Gsigma[2*det_id+1];
 
-			log_exp_term2 = logsumexp4(
-				quadratic_form(j_r1+j_i2+alpha,j_r2-j_i1+alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
-				quadratic_form(j_r1+j_i2-alpha,j_r2-j_i1+alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
-				quadratic_form(j_r1+j_i2+alpha,j_r2-j_i1-alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
-				quadratic_form(j_r1+j_i2-alpha,j_r2-j_i1-alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2
-			) - prefactor0/2;
+			}
 
-			log_exp_term3 = logsumexp4(
-				quadratic_form(j_r1-j_i2+alpha,j_r2+j_i1+alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
-				quadratic_form(j_r1-j_i2-alpha,j_r2+j_i1+alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
-				quadratic_form(j_r1-j_i2+alpha,j_r2+j_i1-alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2,
-				quadratic_form(j_r1-j_i2-alpha,j_r2+j_i1-alpha,M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22)/2
-			) - prefactor0/2;
+			log_exp_term = calcExpterm(j_r1, j_r2,j_i1, j_i2,
+				alpha, prefactor, prefactor0,
+				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22,
+				M0_inverse_11, M0_inverse_12, M0_inverse_21, M0_inverse_22);
 
-			log_exp_term4 = logsumexp4(
-				quadratic_form(j_r1-j_i2+alpha,j_r2-j_i1+alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
-				quadratic_form(j_r1-j_i2-alpha,j_r2-j_i1+alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
-				quadratic_form(j_r1-j_i2+alpha,j_r2-j_i1-alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2,
-				quadratic_form(j_r1-j_i2-alpha,j_r2-j_i1-alpha,M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22)/2
-			) - prefactor/2;
-
-			log_exp_term = logsumexp4(log_exp_term1,log_exp_term2,log_exp_term3,log_exp_term4);
 			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term);
 		}
 
+		// with 2x loop unrolling, 10-20% faster for one thread, but slower for multithreads.
+		/*for(time_id=0;time_id<ntime_interp/2;time_id++){
+			j_r1_0 = 0;
+			j_r2_0 = 0;
+			j_i1_0 = 0;
+			j_i2_0 = 0;
+
+			j_r1_1 = 0;
+			j_r2_1 = 0;
+			j_i1_1 = 0;
+			j_i2_1 = 0;
+
+			time_id_1 = ntime_interp-time_id-1;
+
+			for(det_id=0;det_id<Ndet;det_id++){
+				time_shift = time_shifts[det_id];
+				data0 = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
+				data1 = interpolate_time_series(snr_list[det_id], start_time + time_id_1*dt + time_shift, interp_order);
+
+				j_r1_0 += creal(data0)*Gsigma[2*det_id];
+				j_i1_0 += cimag(data0)*Gsigma[2*det_id];
+				j_r2_0 += creal(data0)*Gsigma[2*det_id+1];
+				j_i2_0 += cimag(data0)*Gsigma[2*det_id+1];
+
+				j_r1_1 += creal(data1)*Gsigma[2*det_id];
+				j_i1_1 += cimag(data1)*Gsigma[2*det_id];
+				j_r2_1 += creal(data1)*Gsigma[2*det_id+1];
+				j_i2_1 += cimag(data1)*Gsigma[2*det_id+1];
+
+			}
+
+			log_exp_term0 = calcExpterm(j_r1_0, j_r2_0,j_i1_0, j_i2_0,
+				alpha, prefactor, prefactor0,
+				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22,
+				M0_inverse_11, M0_inverse_12, M0_inverse_21, M0_inverse_22);
+
+			log_exp_term1 = calcExpterm(j_r1_1, j_r2_1,j_i1_1, j_i2_1,
+				alpha, prefactor, prefactor0,
+				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22,
+				M0_inverse_11, M0_inverse_12, M0_inverse_21, M0_inverse_22);
+
+			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term0);
+			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term1);
+		}*/
+
 		coh_skymap_bicorr[grid_id] = log_prob_margT_bicorr;
-
-		// clean
-		gsl_matrix_free(detector_real_streams);
-		gsl_matrix_free(detector_imag_streams);
-		gsl_matrix_free(M_prime);
-		gsl_matrix_free(G_sigma);
-		gsl_matrix_free(G_sigma_transpose);
-		gsl_matrix_free(J_real_streams);
-		gsl_matrix_free(J_imag_streams);
-
 
 	} // end of for(grid_id)
 	} // end of omp

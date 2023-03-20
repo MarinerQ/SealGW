@@ -243,19 +243,29 @@ static void getGsigma_matrix(const LALDetector *detectors,const double *sigma, i
 	int i;
 	double Gpc[2];
 
-	if(detectors==NULL){
-		printf("You need to create the detector first! \n");
-	}
-	else if(sigma==NULL){
-		printf("You need to assign the value to sigma! \n");
-	}
-
 	for(i=0;i<Ndet;i++){
 		getGpc(detectors[i],ra,dec,gps_time,Gpc);
 		Gsigma[i*2]   = Gpc[0]*sigma[i];
 		Gsigma[i*2+1] = Gpc[1]*sigma[i];
 	}
 
+}
+
+static void calcM(const double *Gsigma, int Ndet, double *M){
+	/* M = Gsigma^T * Gsigma, where Gsigma is a Ndetx2 matrix, M is a 2x2 matrix. */
+	int i,j,k;
+	double sum;
+
+	for(i=0; i<2; i++){
+		for(j=0; j<2; j++)
+		{
+			sum=0;
+			for(k=0; k<Ndet; k++){
+				sum += Gsigma[k*2+i]*Gsigma[k*2+j];
+			}
+			M[2*i+j] = sum;
+		}
+	}
 }
 
 double et_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode){
@@ -341,6 +351,7 @@ void DestroyCOMPLEX16TimeSeriesList(COMPLEX16TimeSeries **lalsnr_array, int ndet
 	}
 }
 
+
 /*
 Coherent localization skymap with bimodal correlated-digonal prior.
 See arXiv:2110.01874.
@@ -385,73 +396,33 @@ void coherent_skymap_bicorr(
 	double sigma_multimodal = prior_sigma;
 	double xi = 1/sigma_multimodal/sigma_multimodal;
 	double alpha = mu_multimodal*xi;
-
-	clock_t t;
-	double time_taken;
 	#pragma omp parallel num_threads(nthread) private(time_id,det_id)  shared(coh_skymap_bicorr,snr_list,detectors)
 	{
 	#pragma omp for
 	for(grid_id=0;grid_id<ngrid;grid_id+=1){
 
-    	t = clock();
 		double Gsigma[2*Ndet];
+		double M[4];
 
-		//gsl_matrix *detector_real_streams = gsl_matrix_calloc(ntime_interp,Ndet);
-		//gsl_matrix *detector_imag_streams = gsl_matrix_calloc(ntime_interp,Ndet);
+		//gsl_matrix *M_prime = gsl_matrix_alloc(2,2);
 
-		gsl_matrix *M_prime = gsl_matrix_alloc(2,2);
-
-		gsl_matrix *G_sigma = gsl_matrix_alloc(Ndet,2); //same as previouly defined
-		gsl_matrix *G_sigma_transpose = gsl_matrix_alloc(2,Ndet);
+		//gsl_matrix *G_sigma = gsl_matrix_alloc(Ndet,2); //same as previouly defined
+		//gsl_matrix *G_sigma_transpose = gsl_matrix_alloc(2,Ndet);
 
 		gsl_matrix *J_real_streams   = gsl_matrix_calloc(ntime_interp,2);
 		gsl_matrix *J_imag_streams   = gsl_matrix_calloc(ntime_interp,2);
-
-		t = clock() - t;
-    	time_taken = ((double)t)/CLOCKS_PER_SEC;;
-		if (grid_id==0){
-			printf("Time cost of allocating: %f\n", time_taken);
-		}
 
 
 		//set parameters
 		double ra  = ra_grids[grid_id];
 		double dec = dec_grids[grid_id];
 
-		/*
-		//time shift the data
-		for(det_id=0;det_id<Ndet;det_id++){
-			double time_shift = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time);
-
-			for(time_id=0;time_id<ntime_interp;time_id++){
-				double complex data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
-				gsl_matrix_set(detector_real_streams,time_id,det_id,creal(data));
-				gsl_matrix_set(detector_imag_streams,time_id,det_id,cimag(data));
-			}
-
-
-			// Use 2x Loop unrooling
-			for(time_id=0;time_id<=ntime_interp/2;time_id+=2){
-				double complex data0 = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
-				gsl_matrix_set(detector_real_streams,time_id,det_id,creal(data0));
-				gsl_matrix_set(detector_imag_streams,time_id,det_id,cimag(data0));
-
-				double complex data1 = interpolate_time_series(snr_list[det_id], start_time + (ntime_interp-time_id-1)*dt + time_shift, interp_order);
-				gsl_matrix_set(detector_real_streams,ntime_interp-time_id-1,det_id,creal(data1));
-				gsl_matrix_set(detector_imag_streams,ntime_interp-time_id-1,det_id,cimag(data1));
-			}
-		}*/
-
-		t = clock() - t;
-    	time_taken = ((double)t)/CLOCKS_PER_SEC;;
-		if (grid_id==0){
-			printf("Time cost of shifting data: %f\n", time_taken);
-		}
-
 		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
 		//Calculate M
 		double temp_element;
 		int ii,jj;
+
+		/*
 		for(ii=0;ii<Ndet;ii++){
 			for(jj=0;jj<2;jj++){
 				temp_element = Gsigma[2*ii+jj];
@@ -459,14 +430,22 @@ void coherent_skymap_bicorr(
 				gsl_matrix_set(G_sigma_transpose,jj,ii,temp_element);
 			}
 		}
-		gsl_matrix_mult(G_sigma_transpose,G_sigma,M_prime); //M_prime here is actually M
+		gsl_matrix_mult(G_sigma_transpose,G_sigma,M_prime); //M_prime here is actually M*/
+
+		calcM(Gsigma, Ndet, M);
+		//printf("M: %f, %f, %f, %f", M[0], M[1],M[2],M[3]);
 
 		//Calculate M'^{-1} and M0'^{-1}
         double M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22;
-        double aa = gsl_matrix_get(M_prime,0,0) + gsl_matrix_get(M_prime,1,1) + xi;
-        double bb = 2*gsl_matrix_get(M_prime,0,1);
-        double cc = 2*gsl_matrix_get(M_prime,1,0);
-        double dd = gsl_matrix_get(M_prime,1,1) + gsl_matrix_get(M_prime,0,0) + xi;
+        //double aa = gsl_matrix_get(M_prime,0,0) + gsl_matrix_get(M_prime,1,1) + xi;
+        //double bb = 2*gsl_matrix_get(M_prime,0,1);
+        //double cc = 2*gsl_matrix_get(M_prime,1,0);
+        //double dd = gsl_matrix_get(M_prime,1,1) + gsl_matrix_get(M_prime,0,0) + xi;
+
+		double aa = M[0] + M[3] + xi;
+        double bb = 2*M[1];
+        double cc = 2*M[2];
+        double dd = M[3] + M[0] + xi;
         double detMprime = aa*dd - bb*cc;
         M_inverse_11 = dd/(aa*dd-bb*cc);
         M_inverse_12 = -cc/(aa*dd-bb*cc);
@@ -474,19 +453,15 @@ void coherent_skymap_bicorr(
         M_inverse_22 = aa/(aa*dd-bb*cc);
 
         double M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22;
-        double aa0 = gsl_matrix_get(M_prime,0,0) + gsl_matrix_get(M_prime,1,1) + xi;
-        double dd0 = gsl_matrix_get(M_prime,1,1) + gsl_matrix_get(M_prime,0,0)+ xi;
+        //double aa0 = gsl_matrix_get(M_prime,0,0) + gsl_matrix_get(M_prime,1,1) + xi;
+        //double dd0 = gsl_matrix_get(M_prime,1,1) + gsl_matrix_get(M_prime,0,0)+ xi;
+		double aa0 = M[0] + M[3] + xi;
+        double dd0 = aa0;
         double detM0prime = aa0*dd0;
         M0_inverse_11 = 1.0/aa0;
         M0_inverse_12 = 0.0;
         M0_inverse_21 = 0.0;
         M0_inverse_22 = 1.0/dd0;
-
-		t = clock() - t;
-    	time_taken = ((double)t)/CLOCKS_PER_SEC;;
-		if (grid_id==0){
-			printf("Time cost of setting M: %f\n", time_taken);
-		}
 
 		//transform mf data to j stream
 		double time_shifts[Ndet];
@@ -501,14 +476,21 @@ void coherent_skymap_bicorr(
 			double temp0_imag=0;
 			double temp1_real=0;
 			double temp1_imag=0;
+
+
 			for(det_id=0;det_id<Ndet;det_id++){
 				time_shift = time_shifts[det_id];
 				data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
 
-				temp0_real += creal(data)*gsl_matrix_get(G_sigma,det_id,0);
+				temp0_real += creal(data)*Gsigma[2*det_id];
+				temp0_imag += cimag(data)*Gsigma[2*det_id];
+				temp1_real += creal(data)*Gsigma[2*det_id+1];
+				temp1_imag += cimag(data)*Gsigma[2*det_id+1];
+
+				/*temp0_real += creal(data)*gsl_matrix_get(G_sigma,det_id,0);
 				temp0_imag += cimag(data)*gsl_matrix_get(G_sigma,det_id,0);
 				temp1_real += creal(data)*gsl_matrix_get(G_sigma,det_id,1);
-				temp1_imag += cimag(data)*gsl_matrix_get(G_sigma,det_id,1);
+				temp1_imag += cimag(data)*gsl_matrix_get(G_sigma,det_id,1);*/
 			}
 			gsl_matrix_set(J_real_streams,time_id,0,temp0_real);
 			gsl_matrix_set(J_imag_streams,time_id,0,temp0_imag);
@@ -516,40 +498,6 @@ void coherent_skymap_bicorr(
 			gsl_matrix_set(J_imag_streams,time_id,1,temp1_imag);
 		}
 
-
-		/*for (time_id = 0; time_id <= ntime_interp/2; time_id += 2) {
-			// Use 2x loop unrolling
-			double temp0_real_0 = 0, temp0_imag_0 = 0, temp1_real_0 = 0, temp1_imag_0 = 0;
-			double temp0_real_1 = 0, temp0_imag_1 = 0, temp1_real_1 = 0, temp1_imag_1 = 0;
-
-			for (det_id = 0; det_id < Ndet; det_id++) {
-				temp0_real_0 += gsl_matrix_get(detector_real_streams, time_id, det_id) * gsl_matrix_get(G_sigma, det_id, 0);
-				temp0_imag_0 += gsl_matrix_get(detector_imag_streams, time_id, det_id) * gsl_matrix_get(G_sigma, det_id, 0);
-				temp1_real_0 += gsl_matrix_get(detector_real_streams, time_id, det_id) * gsl_matrix_get(G_sigma, det_id, 1);
-				temp1_imag_0 += gsl_matrix_get(detector_imag_streams, time_id, det_id) * gsl_matrix_get(G_sigma, det_id, 1);
-
-				temp0_real_1 += gsl_matrix_get(detector_real_streams, ntime_interp-time_id-1, det_id) * gsl_matrix_get(G_sigma, det_id, 0);
-				temp0_imag_1 += gsl_matrix_get(detector_imag_streams, ntime_interp-time_id-1, det_id) * gsl_matrix_get(G_sigma, det_id, 0);
-				temp1_real_1 += gsl_matrix_get(detector_real_streams, ntime_interp-time_id-1, det_id) * gsl_matrix_get(G_sigma, det_id, 1);
-				temp1_imag_1 += gsl_matrix_get(detector_imag_streams, ntime_interp-time_id-1, det_id) * gsl_matrix_get(G_sigma, det_id, 1);
-			}
-			gsl_matrix_set(J_real_streams,time_id,0,temp0_real_0);
-			gsl_matrix_set(J_imag_streams,time_id,0,temp0_imag_0);
-			gsl_matrix_set(J_real_streams,time_id,1,temp1_real_0);
-			gsl_matrix_set(J_imag_streams,time_id,1,temp1_imag_0);
-
-			gsl_matrix_set(J_real_streams,ntime_interp-time_id-1,0,temp0_real_1);
-			gsl_matrix_set(J_imag_streams,ntime_interp-time_id-1,0,temp0_imag_1);
-			gsl_matrix_set(J_real_streams,ntime_interp-time_id-1,1,temp1_real_1);
-			gsl_matrix_set(J_imag_streams,ntime_interp-time_id-1,1,temp1_imag_1);
-		}*/
-
-
-		t = clock() - t;
-    	time_taken = ((double)t)/CLOCKS_PER_SEC;;
-		if (grid_id==0){
-			printf("Time cost of setting J: %f\n", time_taken);
-		}
 
 		//calculate skymap
 		//double snr_temp;
@@ -602,20 +550,12 @@ void coherent_skymap_bicorr(
 			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term);
 		}
 
-		t = clock() - t;
-    	time_taken = ((double)t)/CLOCKS_PER_SEC;;
-		if (grid_id==0){
-			printf("Time cost of time marginalization: %f\n", time_taken);
-		}
-
 		coh_skymap_bicorr[grid_id] = log_prob_margT_bicorr;
 
 		// clean
-		//gsl_matrix_free(detector_real_streams);
-		//gsl_matrix_free(detector_imag_streams);
-		gsl_matrix_free(M_prime);
-		gsl_matrix_free(G_sigma);
-		gsl_matrix_free(G_sigma_transpose);
+		//gsl_matrix_free(M_prime);
+		//gsl_matrix_free(G_sigma);
+		//gsl_matrix_free(G_sigma_transpose);
 		gsl_matrix_free(J_real_streams);
 		gsl_matrix_free(J_imag_streams);
 

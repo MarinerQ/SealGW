@@ -230,6 +230,7 @@ class Seal:
         nthread,
         nlevel=5,
         interp_factor=10,
+        interp_order=0,
         timecost=False,
     ):
         if not self.initialized:
@@ -256,6 +257,7 @@ class Seal:
             prior_mu,
             prior_sigma,
             nthread,
+            interp_order,
         )
         time2 = time.time()
 
@@ -272,6 +274,7 @@ class Seal:
         end_time,
         nlevel=5,
         interp_factor=10,
+        interp_order=0,
         timecost=False,
     ):
         if not self.initialized:
@@ -308,6 +311,7 @@ class Seal:
             prior_mu,
             prior_sigma,
             nthread,
+            interp_order,
         )
         time2 = time.time()
 

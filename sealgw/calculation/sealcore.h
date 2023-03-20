@@ -168,108 +168,6 @@ double complex interpolate_time_series(COMPLEX16TimeSeries *lal_array, double ti
 }
 
 
-/*
-static double complex step_interpolate_time_series(time_series* timeseries, double time)
-{
-	double start_time = timeseries->start_time;
-	//printf("timeseries start time: %f", timeseries->start_time);
-	//printf("timeseries npoint: %f", timeseries->npoint);
-	//printf("timeseries delta t: %f", timeseries->delta_t);
-	double end_time   = timeseries->start_time + timeseries->npoint*timeseries->delta_t;
-	double delta_t    = timeseries->delta_t;
-
-	if(time < start_time){
-		printf("interpolate time can not smaller than the start time of time series!\n");
-		exit(-1);
-	}
-	else if(time > end_time){
-		//printf("%f > %f\n", time, end_time);
-		printf("interpolate time can not larger than the end time of time series!\n");
-		exit(-1);
-	}
-
-	int index = (int)((time-start_time)/delta_t);
-	double diff = (time-start_time)/delta_t-(double)index;
-	double complex int_data;
-	if(diff<0.5){
-		double real = creal(timeseries->data[index]);
-		double imag = cimag(timeseries->data[index]);
-		int_data = real+I*imag;
-	}
-	else{
-		double real = creal(timeseries->data[index+1]);
-		double imag = cimag(timeseries->data[index+1]);
-		int_data = real+I*imag;
-	}
-
-	return int_data;
-}
-
-
-static double complex linear_interpolate_time_series(time_series* timeseries, double time)
-{
-	double start_time = timeseries->start_time;
-	double end_time   = timeseries->start_time + timeseries->npoint*timeseries->delta_t;
-	double delta_t    = timeseries->delta_t;
-
-	if(time < start_time){
-		printf("interpolate time can not smaller than the start time of time series!\n");
-		exit(-1);
-	}
-	else if(time > end_time){
-		printf("interpolate time can not larger than the end time of time series!\n");
-		exit(-1);
-	}
-
-	int index = (int)((time-start_time)/delta_t);
-	double diff = (time-start_time)/delta_t-(double)index;
-	double real = creal(timeseries->data[index])*(1-diff) + creal(timeseries->data[index+1])*diff;
-	double imag = cimag(timeseries->data[index])*(1-diff) + cimag(timeseries->data[index+1])*diff;
-	double complex int_data = real+I*imag;
-
-	return int_data;
-}
-
-static double complex quadratic_interpolate_time_series(time_series* timeseries, double time)
-{
-	double start_time = timeseries->start_time;
-	double end_time   = timeseries->start_time + timeseries->npoint*timeseries->delta_t;
-	double delta_t    = timeseries->delta_t;
-
-	if(time < start_time){
-		printf("interpolate time can not smaller than the start time of time series!\n");
-		exit(-1);
-	}
-	else if(time > end_time){
-		printf("interpolate time can not larger than the end time of time series!\n");
-		exit(-1);
-	}
-
-	int index = (int)((time-start_time)/delta_t);
-	double diff = (time-start_time)/delta_t-(double)index;
-	double complex y_1,y_2,y_3;
-	double x;
-
-	if(diff<0.5){
-		x = diff;
-		y_1 = timeseries->data[index-1];
-		y_2 = timeseries->data[index];
-		y_3 = timeseries->data[index+1];
-	}
-	else{
-		x = 1 - diff;
-		y_1 = timeseries->data[index];
-		y_2 = timeseries->data[index+1];
-		y_3 = timeseries->data[index+2];
-	}
-
-	double real = creal(y_1)*x*(x-1.0)/(2.0) + creal(y_2)*(x+1.0)*(x-1.0)/(-1.0) + creal(y_3)*(x+1)*x/(2.0);
-	double imag = cimag(y_1)*x*(x-1.0)/(2.0) + cimag(y_2)*(x+1.0)*(x-1.0)/(-1.0) + cimag(y_3)*(x+1)*x/(2.0);
-	double int_data = real+I*imag;
-
-	return int_data;
-}
-*/
 
 static void ComputeDetAMResponse(
 		double *fplus,          /**< Returned value of F+ */
@@ -488,14 +386,18 @@ void coherent_skymap_bicorr(
 	double xi = 1/sigma_multimodal/sigma_multimodal;
 	double alpha = mu_multimodal*xi;
 
-
+	clock_t t;
+	double time_taken;
 	#pragma omp parallel num_threads(nthread) private(time_id,det_id)  shared(coh_skymap_bicorr,snr_list,detectors)
 	{
 	#pragma omp for
 	for(grid_id=0;grid_id<ngrid;grid_id+=1){
+
+    	t = clock();
 		double Gsigma[2*Ndet];
-		gsl_matrix *detector_real_streams = gsl_matrix_calloc(ntime_interp,Ndet);
-		gsl_matrix *detector_imag_streams = gsl_matrix_calloc(ntime_interp,Ndet);
+
+		//gsl_matrix *detector_real_streams = gsl_matrix_calloc(ntime_interp,Ndet);
+		//gsl_matrix *detector_imag_streams = gsl_matrix_calloc(ntime_interp,Ndet);
 
 		gsl_matrix *M_prime = gsl_matrix_alloc(2,2);
 
@@ -505,19 +407,45 @@ void coherent_skymap_bicorr(
 		gsl_matrix *J_real_streams   = gsl_matrix_calloc(ntime_interp,2);
 		gsl_matrix *J_imag_streams   = gsl_matrix_calloc(ntime_interp,2);
 
+		t = clock() - t;
+    	time_taken = ((double)t)/CLOCKS_PER_SEC;;
+		if (grid_id==0){
+			printf("Time cost of allocating: %f\n", time_taken);
+		}
+
+
 		//set parameters
 		double ra  = ra_grids[grid_id];
 		double dec = dec_grids[grid_id];
 
-
+		/*
 		//time shift the data
 		for(det_id=0;det_id<Ndet;det_id++){
 			double time_shift = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time);
+
 			for(time_id=0;time_id<ntime_interp;time_id++){
 				double complex data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
 				gsl_matrix_set(detector_real_streams,time_id,det_id,creal(data));
 				gsl_matrix_set(detector_imag_streams,time_id,det_id,cimag(data));
 			}
+
+
+			// Use 2x Loop unrooling
+			for(time_id=0;time_id<=ntime_interp/2;time_id+=2){
+				double complex data0 = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
+				gsl_matrix_set(detector_real_streams,time_id,det_id,creal(data0));
+				gsl_matrix_set(detector_imag_streams,time_id,det_id,cimag(data0));
+
+				double complex data1 = interpolate_time_series(snr_list[det_id], start_time + (ntime_interp-time_id-1)*dt + time_shift, interp_order);
+				gsl_matrix_set(detector_real_streams,ntime_interp-time_id-1,det_id,creal(data1));
+				gsl_matrix_set(detector_imag_streams,ntime_interp-time_id-1,det_id,cimag(data1));
+			}
+		}*/
+
+		t = clock() - t;
+    	time_taken = ((double)t)/CLOCKS_PER_SEC;;
+		if (grid_id==0){
+			printf("Time cost of shifting data: %f\n", time_taken);
 		}
 
 		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
@@ -554,17 +482,33 @@ void coherent_skymap_bicorr(
         M0_inverse_21 = 0.0;
         M0_inverse_22 = 1.0/dd0;
 
+		t = clock() - t;
+    	time_taken = ((double)t)/CLOCKS_PER_SEC;;
+		if (grid_id==0){
+			printf("Time cost of setting M: %f\n", time_taken);
+		}
+
 		//transform mf data to j stream
+		double time_shifts[Ndet];
+		double time_shift;
+		double complex data;
+		for(det_id=0;det_id<Ndet;det_id++){
+			time_shifts[det_id] = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time);
+		}
+
 		for(time_id=0;time_id<ntime_interp;time_id++){
 			double temp0_real=0;
 			double temp0_imag=0;
 			double temp1_real=0;
 			double temp1_imag=0;
 			for(det_id=0;det_id<Ndet;det_id++){
-				temp0_real += gsl_matrix_get(detector_real_streams,time_id,det_id)*gsl_matrix_get(G_sigma,det_id,0);
-				temp0_imag += gsl_matrix_get(detector_imag_streams,time_id,det_id)*gsl_matrix_get(G_sigma,det_id,0);
-				temp1_real += gsl_matrix_get(detector_real_streams,time_id,det_id)*gsl_matrix_get(G_sigma,det_id,1);
-				temp1_imag += gsl_matrix_get(detector_imag_streams,time_id,det_id)*gsl_matrix_get(G_sigma,det_id,1);
+				time_shift = time_shifts[det_id];
+				data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
+
+				temp0_real += creal(data)*gsl_matrix_get(G_sigma,det_id,0);
+				temp0_imag += cimag(data)*gsl_matrix_get(G_sigma,det_id,0);
+				temp1_real += creal(data)*gsl_matrix_get(G_sigma,det_id,1);
+				temp1_imag += cimag(data)*gsl_matrix_get(G_sigma,det_id,1);
 			}
 			gsl_matrix_set(J_real_streams,time_id,0,temp0_real);
 			gsl_matrix_set(J_imag_streams,time_id,0,temp0_imag);
@@ -572,6 +516,40 @@ void coherent_skymap_bicorr(
 			gsl_matrix_set(J_imag_streams,time_id,1,temp1_imag);
 		}
 
+
+		/*for (time_id = 0; time_id <= ntime_interp/2; time_id += 2) {
+			// Use 2x loop unrolling
+			double temp0_real_0 = 0, temp0_imag_0 = 0, temp1_real_0 = 0, temp1_imag_0 = 0;
+			double temp0_real_1 = 0, temp0_imag_1 = 0, temp1_real_1 = 0, temp1_imag_1 = 0;
+
+			for (det_id = 0; det_id < Ndet; det_id++) {
+				temp0_real_0 += gsl_matrix_get(detector_real_streams, time_id, det_id) * gsl_matrix_get(G_sigma, det_id, 0);
+				temp0_imag_0 += gsl_matrix_get(detector_imag_streams, time_id, det_id) * gsl_matrix_get(G_sigma, det_id, 0);
+				temp1_real_0 += gsl_matrix_get(detector_real_streams, time_id, det_id) * gsl_matrix_get(G_sigma, det_id, 1);
+				temp1_imag_0 += gsl_matrix_get(detector_imag_streams, time_id, det_id) * gsl_matrix_get(G_sigma, det_id, 1);
+
+				temp0_real_1 += gsl_matrix_get(detector_real_streams, ntime_interp-time_id-1, det_id) * gsl_matrix_get(G_sigma, det_id, 0);
+				temp0_imag_1 += gsl_matrix_get(detector_imag_streams, ntime_interp-time_id-1, det_id) * gsl_matrix_get(G_sigma, det_id, 0);
+				temp1_real_1 += gsl_matrix_get(detector_real_streams, ntime_interp-time_id-1, det_id) * gsl_matrix_get(G_sigma, det_id, 1);
+				temp1_imag_1 += gsl_matrix_get(detector_imag_streams, ntime_interp-time_id-1, det_id) * gsl_matrix_get(G_sigma, det_id, 1);
+			}
+			gsl_matrix_set(J_real_streams,time_id,0,temp0_real_0);
+			gsl_matrix_set(J_imag_streams,time_id,0,temp0_imag_0);
+			gsl_matrix_set(J_real_streams,time_id,1,temp1_real_0);
+			gsl_matrix_set(J_imag_streams,time_id,1,temp1_imag_0);
+
+			gsl_matrix_set(J_real_streams,ntime_interp-time_id-1,0,temp0_real_1);
+			gsl_matrix_set(J_imag_streams,ntime_interp-time_id-1,0,temp0_imag_1);
+			gsl_matrix_set(J_real_streams,ntime_interp-time_id-1,1,temp1_real_1);
+			gsl_matrix_set(J_imag_streams,ntime_interp-time_id-1,1,temp1_imag_1);
+		}*/
+
+
+		t = clock() - t;
+    	time_taken = ((double)t)/CLOCKS_PER_SEC;;
+		if (grid_id==0){
+			printf("Time cost of setting J: %f\n", time_taken);
+		}
 
 		//calculate skymap
 		//double snr_temp;
@@ -624,11 +602,17 @@ void coherent_skymap_bicorr(
 			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term);
 		}
 
+		t = clock() - t;
+    	time_taken = ((double)t)/CLOCKS_PER_SEC;;
+		if (grid_id==0){
+			printf("Time cost of time marginalization: %f\n", time_taken);
+		}
+
 		coh_skymap_bicorr[grid_id] = log_prob_margT_bicorr;
 
 		// clean
-		gsl_matrix_free(detector_real_streams);
-		gsl_matrix_free(detector_imag_streams);
+		//gsl_matrix_free(detector_real_streams);
+		//gsl_matrix_free(detector_imag_streams);
 		gsl_matrix_free(M_prime);
 		gsl_matrix_free(G_sigma);
 		gsl_matrix_free(G_sigma_transpose);

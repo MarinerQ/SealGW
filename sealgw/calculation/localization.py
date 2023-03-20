@@ -13,7 +13,7 @@ from astropy.coordinates import SkyCoord
 from ligo.skymap import postprocess
 from matplotlib import figure as Figure
 from matplotlib import pyplot as plt
-
+import time
 
 # export OMP_NUM_THREADS=8
 
@@ -200,6 +200,7 @@ def seal_with_adaptive_healpix(
 
         # Calculate skymap (of log prob density)
         coh_skymap_for_this_level = np.zeros(npix_base)
+        # t1=time.time()
         sealcore.Pycoherent_skymap_bicorr(
             coh_skymap_for_this_level,
             time_arrays,
@@ -219,27 +220,27 @@ def seal_with_adaptive_healpix(
             nthread,
             interp_order,
         )
-
+        # t2=time.time()
+        # print(f'time cost of calculating skymap: {t2-t1}')
         # Update skymap
         nfactor = 4 ** (
             nlevel - ilevel
         )  # map a pixel of this level to multiple pixels in the final level
 
-        for i in range(npix_base):  # Can we avoid this loop? It's 3072 times.
-            index = argsort_pix_id[i]
-            skymap_multires[
-                index * nfactor : (index + 1) * nfactor
-            ] = coh_skymap_for_this_level[i]
-
-        # This is even slower...
-        # separated_argsort_pix_id = argsort_pix_id.reshape((npix_base,1)) * nfactor
-        # mapped_final_level_pix_id = (
-        #     np.tile(separated_argsort_pix_id, (1, nfactor))
-        #     + np.tile(np.arange(nfactor), (npix_base,1))
-        # )
-        # skymap_multires[mapped_final_level_pix_id] = np.tile(
-        #     coh_skymap_for_this_level.reshape((npix_base,1)), (1, nfactor)
-        # )
+        if ilevel == 0 or ilevel == 1:
+            for i in range(npix_base):  # Can we avoid this loop? It's 3072 times.
+                index = argsort_pix_id[i]
+                skymap_multires[
+                    index * nfactor : (index + 1) * nfactor
+                ] = coh_skymap_for_this_level[i]
+        else:
+            # This part faster (by 10x) than the for loop above when ilevel>=2,
+            # but slower (by 3x) when ilevel=0,1.
+            # Anyway, this if-else saves about 5-10ms...
+            index_array = argsort_pix_id.reshape(-1, 1) * nfactor + np.arange(nfactor)
+            skymap_multires[index_array.ravel()] = coh_skymap_for_this_level.repeat(
+                nfactor
+            )
 
         # Update argsort
         argsort = np.argsort(coh_skymap_for_this_level)[::-1][: int(npix_base / 4)]

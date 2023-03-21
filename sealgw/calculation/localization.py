@@ -49,7 +49,7 @@ def read_event_info(filepath):
     return trigger_time, ndet, det_codes, snrs, sigmas
 
 
-def extract_info_from_xml(filepath, return_names=False):
+def extract_info_from_xml(filepath, return_names=False, use_timediff=True):
     import spiir.io.ligolw
 
     xmlfile = spiir.io.ligolw.load_coinc_xml(filepath)
@@ -86,6 +86,8 @@ def extract_info_from_xml(filepath, return_names=False):
     sigma_array = deff_array * max_snr_array
     trigger_time = trigger_time / len(det_names)  # mean of trigger times of each det
 
+    if use_timediff:
+        trigger_time = time_array[np.argmax(abs(snr_array))]
     logger.debug("xml processing done. ")
     logger.debug(f"Trigger time: {trigger_time}")
     logger.debug(f"Detectors: {det_names}")
@@ -158,7 +160,9 @@ def seal_with_adaptive_healpix(
     prior_mu,
     prior_sigma,
     nthread,
+    max_snr_det_id,
     interp_order=0,
+    use_timediff=True,
 ):
 
     # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
@@ -201,25 +205,47 @@ def seal_with_adaptive_healpix(
         # Calculate skymap (of log prob density)
         coh_skymap_for_this_level = np.zeros(npix_base)
         # t1=time.time()
-        sealcore.Pycoherent_skymap_bicorr(
-            coh_skymap_for_this_level,
-            time_arrays,
-            snr_arrays,
-            det_code_array,
-            sigma_array,
-            ntimes_array,
-            ndet,
-            ra_to_calculate,
-            dec_to_calculate,
-            npix_base,
-            start_time,
-            end_time,
-            ntime_interp,
-            prior_mu,
-            prior_sigma,
-            nthread,
-            interp_order,
-        )
+        if use_timediff:
+            sealcore.Pycoherent_skymap_bicorr_usetimediff(
+                coh_skymap_for_this_level,
+                time_arrays,
+                snr_arrays,
+                det_code_array,
+                sigma_array,
+                ntimes_array,
+                ndet,
+                ra_to_calculate,
+                dec_to_calculate,
+                npix_base,
+                start_time,
+                end_time,
+                ntime_interp,
+                prior_mu,
+                prior_sigma,
+                nthread,
+                interp_order,
+                max_snr_det_id,
+            )
+        else:
+            sealcore.Pycoherent_skymap_bicorr(
+                coh_skymap_for_this_level,
+                time_arrays,
+                snr_arrays,
+                det_code_array,
+                sigma_array,
+                ntimes_array,
+                ndet,
+                ra_to_calculate,
+                dec_to_calculate,
+                npix_base,
+                start_time,
+                end_time,
+                ntime_interp,
+                prior_mu,
+                prior_sigma,
+                nthread,
+                interp_order,
+            )
         # t2=time.time()
         # print(f'time cost of calculating skymap: {t2-t1}')
         # Update skymap

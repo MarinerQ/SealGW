@@ -150,7 +150,7 @@ class Seal:
             )
             if source_type in ['BNS', 'NSBH']:
                 horizon = horizon * 0.6  # get more high SNR samples for fitting
-            logger.debug(
+            logger.warning(
                 f"Warning: Max luminosity distance is not provided. Using {horizon}Mpc."
             )
             samples = get_fitting_source_para_sample(
@@ -232,6 +232,7 @@ class Seal:
         interp_factor=10,
         interp_order=0,
         timecost=False,
+        use_timediff=True,
     ):
         if not self.initialized:
             raise Exception("Seal not initialized!")
@@ -241,6 +242,9 @@ class Seal:
 
         prior_mu = self.prior_coef_a * max_snr + self.prior_coef_b
         prior_sigma = self.prior_coef_c * max_snr + self.prior_coef_d
+
+        # assume ntimes are equal here. potential bug if they don't.
+        max_snr_det_id = np.argmax(abs(snr_arrays)) // ntimes[0]
 
         time1 = time.time()
         log_prob_skymap = seal_with_adaptive_healpix(
@@ -257,7 +261,9 @@ class Seal:
             prior_mu,
             prior_sigma,
             nthread,
+            max_snr_det_id,
             interp_order,
+            use_timediff,
         )
         time2 = time.time()
 
@@ -272,10 +278,12 @@ class Seal:
         nthread,
         start_time,
         end_time,
+        max_snr_det_id=-1,
         nlevel=5,
         interp_factor=10,
         interp_order=0,
         timecost=False,
+        use_timediff=True,
     ):
         if not self.initialized:
             raise Exception("Seal not initialized!")
@@ -296,6 +304,8 @@ class Seal:
         prior_mu = self.prior_coef_a * max_snr + self.prior_coef_b
         prior_sigma = self.prior_coef_c * max_snr + self.prior_coef_d
 
+        max_snr_det_id = np.argmax(max_snr_array)
+
         time1 = time.time()
         log_prob_skymap = seal_with_adaptive_healpix(
             nlevel,
@@ -311,7 +321,9 @@ class Seal:
             prior_mu,
             prior_sigma,
             nthread,
+            max_snr_det_id,
             interp_order,
+            use_timediff,
         )
         time2 = time.time()
 

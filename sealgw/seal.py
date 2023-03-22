@@ -248,7 +248,7 @@ class Seal:
         max_snr_det_id = np.searchsorted(cumulative_ntimes, max_snr_index)
 
         time1 = time.time()
-        log_prob_skymap = seal_with_adaptive_healpix(
+        prob_skymap = seal_with_adaptive_healpix(
             nlevel,
             time_arrays,
             snr_arrays,
@@ -269,9 +269,9 @@ class Seal:
         time2 = time.time()
 
         if timecost:
-            return log_prob_skymap, time2 - time1
+            return prob_skymap, time2 - time1
         else:
-            return log_prob_skymap
+            return prob_skymap
 
     def localize_with_spiir_xml(
         self,
@@ -308,7 +308,7 @@ class Seal:
         max_snr_det_id = np.argmax(max_snr_array)
 
         time1 = time.time()
-        log_prob_skymap = seal_with_adaptive_healpix(
+        prob_skymap = seal_with_adaptive_healpix(
             nlevel,
             time_arrays,
             snr_arrays,
@@ -329,9 +329,9 @@ class Seal:
         time2 = time.time()
 
         if timecost:
-            log_prob_skymap, time2 - time1
+            prob_skymap, time2 - time1
         else:
-            return log_prob_skymap
+            return prob_skymap
 
     def _catalog_test_kernel(
         self,

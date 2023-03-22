@@ -146,6 +146,16 @@ def deg2perpix(nlevel):
     return deg2perpix
 
 
+def normalize_log_probabilities(log_probs: np.ndarray) -> np.ndarray:
+    """Converts log probabilities into a normalized probability array."""
+    max_log_prob = np.max(log_probs)
+    np.subtract(log_probs, max_log_prob, out=log_probs)
+    np.exp(log_probs, out=log_probs)
+    sum_probs = np.sum(log_probs)
+    np.divide(log_probs, sum_probs, out=log_probs)
+    return log_probs
+
+
 def seal_with_adaptive_healpix(
     nlevel,
     time_arrays,
@@ -277,7 +287,7 @@ def seal_with_adaptive_healpix(
                 argsort_temp * 4 + j
             )  # map to next-level grids-to-calculate
 
-    return skymap_multires
+    return normalize_log_probabilities(skymap_multires)
 
 
 def get_det_code_array(det_name_list):
@@ -292,7 +302,7 @@ def get_det_code_array(det_name_list):
 
 
 def plot_skymap(
-    log_probs: np.ndarray,
+    probs: np.ndarray,
     save_filename: Optional[str] = None,
     true_ra: float = None,
     true_dec: float = None,
@@ -301,11 +311,8 @@ def plot_skymap(
     title: Optional[str] = None,
     figsize: Tuple[float, float] = (14, 7),
 ) -> Figure:
-    """Plots a localisation skymap using from a log probability density array."""
+    """Plots a localisation skymap using from a probability density array."""
     import spiir.search.skymap
-
-    # normalise probability skymap
-    skymap = normalize_log_probabilities(log_probs)
 
     # add ground truth marker if both ra and dec are not None
     ground_truth = None
@@ -321,7 +328,7 @@ def plot_skymap(
         inset_kwargs = None
 
     fig = spiir.search.skymap.plot_skymap(
-        skymap,
+        probs,
         contours=[50, 90],
         ground_truth=ground_truth,
         colorbar=False,
@@ -346,7 +353,6 @@ def apply_fudge_factor(probs: np.ndarray, fudge_percent: float) -> np.ndarray:
     will be multiplied by 90/95 so that it becomes 90% area.
 
     """
-    probs = normalize_log_probabilities(probs)
     # Find the top values that summed up to 0.9 in probs
     sorted_probs = np.sort(probs)[::-1]
     cumulative_probs = np.cumsum(sorted_probs)
@@ -355,41 +361,29 @@ def apply_fudge_factor(probs: np.ndarray, fudge_percent: float) -> np.ndarray:
 
     # Apply fudge factor
     fudge_factor = 0.9 / fudge_percent
-    fudge_factored_logprob_skymap = np.where(
-        top_90_probs_mask, probs * fudge_factor, probs
-    )
-    fudge_factored_logprob_skymap /= np.sum(fudge_factored_logprob_skymap)
+    fudge_factored_probs = np.where(top_90_probs_mask, probs * fudge_factor, probs)
+    fudge_factored_probs /= np.sum(fudge_factored_probs)
 
-    fudge_factored_logprob_skymap = np.log(fudge_factored_logprob_skymap)
-    return fudge_factored_logprob_skymap
+    return fudge_factored_probs
 
 
-def normalize_log_probabilities(log_probs: np.ndarray) -> np.ndarray:
-    """Converts log probabilities into a normalized probability array."""
-    probs = np.exp(log_probs - max(log_probs))
-    probs /= sum(probs)
-    return probs
-
-
-def confidence_area(log_probs, confidence_level):
+def confidence_area(probs, confidence_level):
     """
-    skymap: log prob skymap
+    skymap: probability skymap
     confidence_level: float or array
 
     returns confidence area at given confidence lvel.
     """
-    skymap = normalize_log_probabilities(log_probs)
-
-    nside = ah.npix_to_nside(len(skymap))
+    nside = ah.npix_to_nside(len(probs))
     deg2perpix = ah.nside_to_pixel_area(nside).to_value(u.deg**2)
 
-    credible_levels = 100 * postprocess.find_greedy_credible_levels(skymap)
+    credible_levels = 100 * postprocess.find_greedy_credible_levels(probs)
     area = np.searchsorted(np.sort(credible_levels), confidence_level) * deg2perpix
 
     return area
 
 
-def cumulative_percentage(log_probs, ra, dec):
+def cumulative_percentage(probs, ra, dec):
     """
     Find cumulative percentage at (ra, dec).
 
@@ -397,65 +391,59 @@ def cumulative_percentage(log_probs, ra, dec):
 
     When reach the lowest prob pixel, prob accumulate to one.
     """
-    skymap = normalize_log_probabilities(log_probs)
-
     theta = np.pi / 2 - dec
     phi = ra
 
-    nside = ah.npix_to_nside(len(skymap))  # confirm this is the correct nside
+    nside = ah.npix_to_nside(len(probs))  # confirm this is the correct nside
     pixel_index = hp.pixelfunc.ang2pix(nside, theta, phi, nest=True)
 
-    prob_here = skymap[pixel_index]
-    larger_prob_index = np.where(skymap > prob_here)[0]
+    prob_here = probs[pixel_index]
+    larger_prob_index = np.where(probs > prob_here)[0]
 
-    percentage = sum(skymap[larger_prob_index])
+    percentage = sum(probs[larger_prob_index])
 
     return percentage
 
 
-def search_area(log_probs, ra, dec):
+def search_area(probs, ra, dec):
     """
     Find cumulative search area at (ra, dec), search from the highest pixel.
 
     When reach the lowest prob pixel, prob accumulate to one.
     """
-    skymap = normalize_log_probabilities(log_probs)
-
-    nside = ah.npix_to_nside(len(skymap))
+    nside = ah.npix_to_nside(len(probs))
     deg2perpix = ah.nside_to_pixel_area(nside).to_value(u.deg**2)
 
     theta = np.pi / 2 - dec
     phi = ra
     pixel_index = hp.pixelfunc.ang2pix(nside, theta, phi, nest=True)
 
-    prob_here = skymap[pixel_index]
-    larger_prob_index = np.where(skymap > prob_here)[0]
+    prob_here = probs[pixel_index]
+    larger_prob_index = np.where(probs > prob_here)[0]
 
     area = len(larger_prob_index) * deg2perpix
 
     return area
 
 
-def catalog_test_statistics(log_probs, ra_inj, dec_inj):
+def catalog_test_statistics(probs, ra_inj, dec_inj):
     """
     return all statistics that catalog test needs.
     """
-    skymap = normalize_log_probabilities(log_probs)
-
-    nside = ah.npix_to_nside(len(skymap))
+    nside = ah.npix_to_nside(len(probs))
     deg2perpix = ah.nside_to_pixel_area(nside).to_value(u.deg**2)
 
     theta = np.pi / 2 - dec_inj
     phi = ra_inj
     pixel_index = hp.pixelfunc.ang2pix(nside, theta, phi, nest=True)
 
-    prob_here = skymap[pixel_index]
-    larger_prob_index = np.where(skymap > prob_here)[0]
+    prob_here = probs[pixel_index]
+    larger_prob_index = np.where(probs > prob_here)[0]
 
-    inj_point_cumulative_percentage = sum(skymap[larger_prob_index])
+    inj_point_cumulative_percentage = sum(probs[larger_prob_index])
     search_area = len(larger_prob_index) * deg2perpix
 
-    credible_levels = 100 * postprocess.find_greedy_credible_levels(skymap)
+    credible_levels = 100 * postprocess.find_greedy_credible_levels(probs)
     levels = [50, 90]
     confidence_areas = np.searchsorted(np.sort(credible_levels), levels) * deg2perpix
 

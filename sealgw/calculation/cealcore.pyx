@@ -153,3 +153,73 @@ def Pycoherent_skymap_bicorr_usetimediff(
 	)
 
     return coh_skymap_bicorr
+
+
+
+cdef extern from "sealcore.h":
+    void coherent_skymap_multires_bicorr(
+		double *coh_skymap_multires_bicorr,
+		const double *time_arrays,
+		const double complex *snr_arrays,
+		const int *detector_codes,
+		const double *sigmas,
+		const int *ntimes,
+		const int Ndet,
+		const double start_time,
+		const double end_time,
+		const int ntime_interp,
+		const double prior_mu,
+		const double prior_sigma,
+		const int nthread,
+		const int interp_order,
+		const int max_snr_det_id,
+		const int nlevel,
+		const int use_timediff);
+
+
+def Pycoherent_skymap_multires_bicorr(
+                double[:] coh_skymap_multires_bicorr,
+                double[:] time_arrays,
+				double complex[:] snr_arrays,
+				int[:] detector_codes,
+				double[:] sigmas,
+				int[:] ntimes,
+				int Ndet,
+				double start_time,
+				double end_time,
+				int ntime_interp,
+                double prior_mu,
+                double prior_sigma,
+				int nthread,
+				int interp_order,
+				int max_snr_det_id,
+				const int nlevel,
+				const int use_timediff): # 'arr' is a one-dimensional numpy array
+
+    #if not coh_skymap_bicorr.flags['C_CONTIGUOUS']:
+	# Makes a contiguous copy of the numpy array.
+    #    coh_skymap_bicorr = np.ascontiguousarray(coh_skymap_bicorr)
+
+    cdef double[:] coh_skymap_multires_bicorr_memview = coh_skymap_multires_bicorr
+
+    coherent_skymap_multires_bicorr(
+			&coh_skymap_multires_bicorr_memview[0],
+			&time_arrays[0],
+			&snr_arrays[0],
+			&detector_codes[0],
+			&sigmas[0],
+			&ntimes[0],
+			Ndet,
+			start_time,
+			end_time,
+			ntime_interp,
+			prior_mu,
+			prior_sigma,
+			nthread,
+			interp_order,
+			max_snr_det_id,
+			nlevel,
+			use_timediff
+	)
+
+    return coh_skymap_multires_bicorr

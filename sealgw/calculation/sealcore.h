@@ -672,12 +672,13 @@ void coherent_skymap_bicorr_usetimediff(
 		double time_shift;
 		double complex data;
 		double complex data0,data1;
+		double max_snr_det_dt = XLALTimeDelayFromEarthCenter((detectors[max_snr_det_id]).location,ra,dec,&ligo_gps_time);
 		for(det_id=0;det_id<Ndet;det_id++){
 			if(det_id==max_snr_det_id){
 				time_shifts[det_id] = 0.0;
 			}
 			else{
-				time_shifts[det_id] = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time)-XLALTimeDelayFromEarthCenter((detectors[max_snr_det_id]).location,ra,dec,&ligo_gps_time);
+				time_shifts[det_id] = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time)-max_snr_det_dt;
 			}
 		}
 

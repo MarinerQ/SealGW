@@ -243,8 +243,9 @@ class Seal:
         prior_mu = self.prior_coef_a * max_snr + self.prior_coef_b
         prior_sigma = self.prior_coef_c * max_snr + self.prior_coef_d
 
-        # assume ntimes are equal here. potential bug if they don't.
-        max_snr_det_id = np.argmax(abs(snr_arrays)) // ntimes[0]
+        max_snr_index = np.argmax(abs(snr_arrays))
+        cumulative_ntimes = np.cumsum(ntimes)
+        max_snr_det_id = np.searchsorted(cumulative_ntimes, max_snr_index)
 
         time1 = time.time()
         log_prob_skymap = seal_with_adaptive_healpix(

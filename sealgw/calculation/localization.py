@@ -337,6 +337,33 @@ def plot_skymap(
     return fig
 
 
+def apply_fudge_factor(probs: np.ndarray, fudge_percent: float) -> np.ndarray:
+    """
+    Apply a fudge factor to a probability healpix skymap to renormalize the probabilities.
+    The fudge factor is determined by experiment to adjust 90% area.
+
+    e.g., if 95% area gets 90% simulations right, the fudge_percent 0.95. The top 95% of prob skymap
+    will be multiplied by 90/95 so that it becomes 90% area.
+
+    """
+    probs = normalize_log_probabilities(probs)
+    # Find the top values that summed up to 0.9 in probs
+    sorted_probs = np.sort(probs)[::-1]
+    cumulative_probs = np.cumsum(sorted_probs)
+    index_90 = np.searchsorted(cumulative_probs, fudge_percent)
+    top_90_probs_mask = probs >= sorted_probs[index_90]
+
+    # Apply fudge factor
+    fudge_factor = 0.9 / fudge_percent
+    fudge_factored_logprob_skymap = np.where(
+        top_90_probs_mask, probs * fudge_factor, probs
+    )
+    fudge_factored_logprob_skymap /= np.sum(fudge_factored_logprob_skymap)
+
+    fudge_factored_logprob_skymap = np.log(fudge_factored_logprob_skymap)
+    return fudge_factored_logprob_skymap
+
+
 def normalize_log_probabilities(log_probs: np.ndarray) -> np.ndarray:
     """Converts log probabilities into a normalized probability array."""
     probs = np.exp(log_probs - max(log_probs))

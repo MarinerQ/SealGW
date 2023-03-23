@@ -438,7 +438,10 @@ def apply_fudge_factor(probs: np.ndarray, fudge_percent: float) -> np.ndarray:
 
     # Apply fudge factor
     fudge_factor = 0.9 / fudge_percent
-    fudge_factored_probs = np.where(top_90_probs_mask, probs * fudge_factor, probs)
+    fudge_facto4norm = 0.1 / (1 - fudge_percent)
+    fudge_factored_probs = np.where(
+        top_90_probs_mask, probs * fudge_factor, probs * fudge_facto4norm
+    )
     fudge_factored_probs /= np.sum(fudge_factored_probs)
 
     return fudge_factored_probs

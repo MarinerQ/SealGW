@@ -229,7 +229,7 @@ class Seal:
         end_time,
         nthread,
         nlevel=5,
-        interp_factor=10,
+        interp_factor=8,
         interp_order=0,
         timecost=False,
         use_timediff=True,

@@ -574,8 +574,10 @@ void coherent_skymap_bicorr_usetimediff(
 				const double *sigmas,
 				const int *ntimes,
 				const int Ndet,
-				const double *ra_grids,
-				const double *dec_grids,
+				//const double *ra_grids,
+				//const double *dec_grids,
+				const int *argsort_pix_id,
+				const int nside,
 				const int ngrid,
 				const double start_time,
 				const double end_time,
@@ -618,8 +620,11 @@ void coherent_skymap_bicorr_usetimediff(
 		double M[4];
 
 		//set parameters
-		double ra  = ra_grids[grid_id];
-		double dec = dec_grids[grid_id];
+		//double ra  = ra_grids[grid_id];
+		//double dec = dec_grids[grid_id];
+		double ra, dec;
+		pix2ang_nest64(nside, argsort_pix_id[grid_id], &dec, &ra);
+		dec = M_PI/2 - dec;
 
 		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
 		//Calculate M
@@ -746,18 +751,24 @@ void coherent_skymap_bicorr_usetimediff(
 	//DestroyCOMPLEX16TimeSeriesList(snr_list,Ndet);
 }
 
-void _coherent_skymap_bicorr_usetimediff(
+/*
+Coherent localization skymap with bimodal correlated-digonal prior.
+See arXiv:2110.01874.
+This function uses the max-snr detector's timestamp as the time parameter to be marginalized,
+rather than geocent time tc. This is more robust in real detection in which true tc is unknown.
+max_snr_det_id is used to label the detector - from 0,1,2, rather than LAL det code.
+This function is for internal use. To call this in python, use coherent_skymap_bicorr_usetimediff.
+*/
+void _coherent_skymap_bicorr(
 				double *coh_skymap_bicorr, // The probability skymap we want to return
 				const double *time_arrays,
-				//const double complex *snr_arrays,
 				COMPLEX16TimeSeries **snr_list,
-				//const int *detector_codes,
 				LALDetector *detectors,
 				const double *sigmas,
 				const int *ntimes,
 				const int Ndet,
-				const double *ra_grids,
-				const double *dec_grids,
+				const int *argsort_pix_id,
+				const int nside,
 				const int ngrid,
 				const double start_time,
 				const double end_time,
@@ -766,19 +777,13 @@ void _coherent_skymap_bicorr_usetimediff(
                 const double prior_sigma,
 				const int nthread,
 				const int interp_order,
-				const int max_snr_det_id)
+				const int max_snr_det_id,
+				const int use_timediff)
 {
 	int grid_id,time_id,det_id;
 
 	double dt = (end_time-start_time)/ntime_interp;
 	double ref_gps_time = (start_time + end_time)/2.0;
-
-	/*
-	LALDetector tempdet, detectors[Ndet];
-	for(det_id=0; det_id<Ndet; det_id++){
-		tempdet = lalCachedDetectors[detector_codes[det_id]];
-		detectors[det_id] = tempdet;
-	}*/
 
 	LIGOTimeGPS ligo_gps_time;
 	ligo_gps_time.gpsSeconds = (int)(ref_gps_time);
@@ -798,9 +803,9 @@ void _coherent_skymap_bicorr_usetimediff(
 		double Gsigma[2*Ndet];
 		double M[4];
 
-		//set parameters
-		double ra  = ra_grids[grid_id];
-		double dec = dec_grids[grid_id];
+		double ra, dec;
+		pix2ang_nest64(nside, argsort_pix_id[grid_id], &dec, &ra);
+		dec = M_PI/2 - dec;
 
 		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
 		//Calculate M
@@ -827,9 +832,7 @@ void _coherent_skymap_bicorr_usetimediff(
         M0_inverse_22 = 1.0/dd0;
 
 		double log_exp_term;
-		//double log_exp_term0,log_exp_term1;
 		double j_r1,j_r2,j_i1,j_i2;
-		//double j_r1_0,j_r2_0,j_i1_0,j_i2_0,j_r1_1,j_r2_1,j_i1_1,j_i2_1;
 		int time_id_1;
 		double log_prob_margT_bicorr=-100;
 		double prefactor = log(detMprime);
@@ -841,12 +844,15 @@ void _coherent_skymap_bicorr_usetimediff(
 		double complex data;
 		double complex data0,data1;
 		double max_snr_det_dt = XLALTimeDelayFromEarthCenter((detectors[max_snr_det_id]).location,ra,dec,&ligo_gps_time);
+		double dt_ref=0.0;
+		if (use_timediff){dt_ref = max_snr_det_dt;}
+
 		for(det_id=0;det_id<Ndet;det_id++){
 			if(det_id==max_snr_det_id){
-				time_shifts[det_id] = 0.0;
+				time_shifts[det_id] = max_snr_det_dt-dt_ref;
 			}
 			else{
-				time_shifts[det_id] = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time)-max_snr_det_dt;
+				time_shifts[det_id] = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time)-dt_ref;
 			}
 		}
 
@@ -876,55 +882,9 @@ void _coherent_skymap_bicorr_usetimediff(
 			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term);
 		}
 
-		// with 2x loop unrolling, 10-20% faster for one thread, but slower for multithreads.
-		/*for(time_id=0;time_id<ntime_interp/2;time_id++){
-			j_r1_0 = 0;
-			j_r2_0 = 0;
-			j_i1_0 = 0;
-			j_i2_0 = 0;
-
-			j_r1_1 = 0;
-			j_r2_1 = 0;
-			j_i1_1 = 0;
-			j_i2_1 = 0;
-
-			time_id_1 = ntime_interp-time_id-1;
-
-			for(det_id=0;det_id<Ndet;det_id++){
-				time_shift = time_shifts[det_id];
-				data0 = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
-				data1 = interpolate_time_series(snr_list[det_id], start_time + time_id_1*dt + time_shift, interp_order);
-
-				j_r1_0 += creal(data0)*Gsigma[2*det_id];
-				j_i1_0 += cimag(data0)*Gsigma[2*det_id];
-				j_r2_0 += creal(data0)*Gsigma[2*det_id+1];
-				j_i2_0 += cimag(data0)*Gsigma[2*det_id+1];
-
-				j_r1_1 += creal(data1)*Gsigma[2*det_id];
-				j_i1_1 += cimag(data1)*Gsigma[2*det_id];
-				j_r2_1 += creal(data1)*Gsigma[2*det_id+1];
-				j_i2_1 += cimag(data1)*Gsigma[2*det_id+1];
-
-			}
-
-			log_exp_term0 = calcExpterm(j_r1_0, j_r2_0,j_i1_0, j_i2_0,
-				alpha, prefactor, prefactor0,
-				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22,
-				M0_inverse_11, M0_inverse_12, M0_inverse_21, M0_inverse_22);
-
-			log_exp_term1 = calcExpterm(j_r1_1, j_r2_1,j_i1_1, j_i2_1,
-				alpha, prefactor, prefactor0,
-				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22,
-				M0_inverse_11, M0_inverse_12, M0_inverse_21, M0_inverse_22);
-
-			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term0);
-			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term1);
-		}*/
-
 		coh_skymap_bicorr[grid_id] = log_prob_margT_bicorr;
 	} // end of for(grid_id)
 	} // end of omp
-	//DestroyCOMPLEX16TimeSeriesList(snr_list,Ndet);
 }
 
 
@@ -1044,18 +1004,7 @@ void coherent_skymap_multires_bicorr(
 	int nside_final = nside_base*pow(2,nlevel);
 	int npix_final = 12*nside_final*nside_final;
 
-	// ra, dec for the final resolution
-	double *ra_grids_final  = (double*)malloc(sizeof(double)*npix_final);
-	double *dec_grids_final = (double*)malloc(sizeof(double)*npix_final);
-	//double *coh_skymap_multires = (double*)malloc(sizeof(double)*npix_final);
-	create_healpix_skygrids(nside_final, ra_grids_final, dec_grids_final);
-
-	// ra, dec to calculate at. Same number in each loop
-	double *ra_grids_calc  = (double*)malloc(sizeof(double)*npix_base);
-	double *dec_grids_calc = (double*)malloc(sizeof(double)*npix_base);
 	double *coh_skymap = (double*)malloc(sizeof(double)*npix_base);
-	double *ra_grids_temp,*dec_grids_temp;
-
 	//initialize the argsort
 	int *argsort        = (int*)malloc(sizeof(int)*npix_base/4);
 	int *argsort_temp   = (int*)malloc(sizeof(int)*npix_base/4);
@@ -1079,59 +1028,28 @@ void coherent_skymap_multires_bicorr(
 	for(i_level=0;i_level<nlevel+1;i_level++){
 		int i_nside = nside_base*pow(2,i_level);
 		int i_npix  = 12*i_nside*i_nside;
-		ra_grids_temp  = (double*)malloc(sizeof(double)*i_npix);
-		dec_grids_temp = (double*)malloc(sizeof(double)*i_npix);
-		create_healpix_skygrids(i_nside, ra_grids_temp, dec_grids_temp);
-
-		for(i=0;i<npix_base;i++){
-			ra_grids_calc[i]  = ra_grids_temp[argsort_pix_id[i]];
-			dec_grids_calc[i] = dec_grids_temp[argsort_pix_id[i]];
-		}
-
 		//calculate skymap
-		if (use_timediff){
-			_coherent_skymap_bicorr_usetimediff(
-					coh_skymap, // The probability skymap we want to return
-					time_arrays,
-					snr_list,
-					//snr_arrays
-					//detector_codes,
-					detectors,
-					sigmas,
-					ntimes,
-					Ndet,
-					ra_grids_calc,
-					dec_grids_calc,
-					npix_base,
-					start_time,
-					end_time,
-					ntime_interp,
-					prior_mu,
-					prior_sigma,
-					nthread,
-					interp_order,
-					max_snr_det_id);
-		}
-		else{
-			coherent_skymap_bicorr(
-					coh_skymap,
-					time_arrays,
-					snr_arrays,
-					detector_codes,
-					sigmas,
-					ntimes,
-					Ndet,
-					ra_grids_calc,
-					dec_grids_calc,
-					npix_base,
-					start_time,
-					end_time,
-					ntime_interp,
-					prior_mu,
-					prior_sigma,
-					nthread,
-					interp_order);
-		}
+		_coherent_skymap_bicorr(
+				coh_skymap, // The probability skymap we want to return
+				time_arrays,
+				snr_list,
+				detectors,
+				sigmas,
+				ntimes,
+				Ndet,
+				argsort_pix_id,
+				i_nside,
+				npix_base,
+				start_time,
+				end_time,
+				ntime_interp,
+				prior_mu,
+				prior_sigma,
+				nthread,
+				interp_order,
+				max_snr_det_id,
+				use_timediff);
+
 
 		//update skymap
 		int nfactor = (int)pow(4,nlevel-i_level);
@@ -1143,29 +1061,27 @@ void coherent_skymap_multires_bicorr(
 			}
 		}
 
-		argsort = rank_OneOfFour(coh_skymap,npix_base);
-		for(i=0;i<npix_base/4;i++){
-			argsort_temp[i] = argsort_pix_id[argsort[i]];
-		}
-		for(i=0;i<npix_base/4;i++){
-			for(j=0;j<4;j++){
-				argsort_pix_id[i*4+j] = argsort_temp[i]*4+j;
+		if(i_level<nlevel+1){
+			argsort = rank_OneOfFour(coh_skymap,npix_base);
+			for(i=0;i<npix_base/4;i++){
+				argsort_temp[i] = argsort_pix_id[argsort[i]];
+			}
+
+			// new pixel ids for the next loop
+			for(i=0;i<npix_base/4;i++){
+				for(j=0;j<4;j++){
+					argsort_pix_id[i*4+j] = argsort_temp[i]*4+j;
+				}
 			}
 		}
 
-	}
-	//normalize_log_probs(npix_final, coh_skymap_multires_bicorr);
+	} // end of multires loop
 
+	normalize_log_probs(npix_final, coh_skymap_multires_bicorr);
 
-	free(ra_grids_final);
-	free(ra_grids_calc);
-	free(dec_grids_final);
-	free(dec_grids_calc);
 	free(argsort);
 	free(argsort_temp);
 	free(argsort_pix_id);
 	free(coh_skymap);
-	free(ra_grids_temp);
-	free(dec_grids_temp);
 	DestroyCOMPLEX16TimeSeriesList(snr_list,Ndet);
 }

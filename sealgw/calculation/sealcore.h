@@ -17,6 +17,8 @@
 #include <lal/Date.h>
 #include <lal/Units.h>
 
+#include <chealpix.h>
+
 COMPLEX16TimeSeries * 	XLALCreateCOMPLEX16TimeSeries (const CHAR *name, const LIGOTimeGPS *epoch, REAL8 f0, REAL8 deltaT, const LALUnit *sampleUnits, size_t length);
 
 void XLALDestroyCOMPLEX16TimeSeries (COMPLEX16TimeSeries *series);
@@ -88,11 +90,7 @@ static void gsl_matrix_mult(const gsl_matrix *A, const gsl_matrix *B, gsl_matrix
 
 static double quadratic_form(double a1, double a2, double m11, double m12, double m21, double m22)
 {
-	double temp1,temp2,temp3;
-	temp1 = m11*a1*a1;
-	temp2 = (m12 + m21)*a1*a2;
-	temp3 = m22*a2*a2;
-	return temp1+temp2+temp3;
+    return m11 * a1 * a1 + (m12 + m21) * a1 * a2 + m22 * a2 * a2;
 }
 
 double complex interpolate_time_series(COMPLEX16TimeSeries *lal_array, double time, int interp_order){
@@ -112,27 +110,15 @@ double complex interpolate_time_series(COMPLEX16TimeSeries *lal_array, double ti
 	int index = (int)((time-start_time)/deltat);
 	double diff = (time-start_time)/deltat-(double)index;
 	double complex int_data;
-	double real, imag;
 
 	if (interp_order==0)
 	{ // step interpolation
-		if(diff<0.5)
-		{
-			real = creal(lal_array->data->data[index]);
-			imag = cimag(lal_array->data->data[index]);
-			int_data = real+I*imag;
-	}
-		else
-		{
-			real = creal(lal_array->data->data[index+1]);
-			imag = cimag(lal_array->data->data[index+1]);
-			int_data = real+I*imag;
-		}
+		int_data = lal_array->data->data[diff < 0.5 ? index : index + 1];
 	}
 	else if(interp_order == 1)
 	{ // linear interpolation
-		real = creal(lal_array->data->data[index])*(1-diff) + creal(lal_array->data->data[index+1])*diff;
-		imag = cimag(lal_array->data->data[index])*(1-diff) + cimag(lal_array->data->data[index+1])*diff;
+		double real = creal(lal_array->data->data[index])*(1-diff) + creal(lal_array->data->data[index+1])*diff;
+		double imag = cimag(lal_array->data->data[index])*(1-diff) + cimag(lal_array->data->data[index+1])*diff;
 		int_data = real+I*imag;
 	}
 	else if(interp_order == 2)
@@ -155,8 +141,8 @@ double complex interpolate_time_series(COMPLEX16TimeSeries *lal_array, double ti
 			y_3 = lal_array->data->data[index+2];
 		}
 
-		real = creal(y_1)*x*(x-1.0)/(2.0) + creal(y_2)*(x+1.0)*(x-1.0)/(-1.0) + creal(y_3)*(x+1)*x/(2.0);
-		imag = cimag(y_1)*x*(x-1.0)/(2.0) + cimag(y_2)*(x+1.0)*(x-1.0)/(-1.0) + cimag(y_3)*(x+1)*x/(2.0);
+		double real = creal(y_1)*x*(x-1.0)/(2.0) + creal(y_2)*(x+1.0)*(x-1.0)/(-1.0) + creal(y_3)*(x+1)*x/(2.0);
+		double imag = cimag(y_1)*x*(x-1.0)/(2.0) + cimag(y_2)*(x+1.0)*(x-1.0)/(-1.0) + cimag(y_3)*(x+1)*x/(2.0);
 		int_data = real+I*imag;
 	}
 	else{
@@ -475,9 +461,9 @@ void coherent_skymap_bicorr(
         M0_inverse_22 = 1.0/dd0;
 
 		double log_exp_term;
-		double log_exp_term0,log_exp_term1;
+		//double log_exp_term0,log_exp_term1;
 		double j_r1,j_r2,j_i1,j_i2;
-		double j_r1_0,j_r2_0,j_i1_0,j_i2_0,j_r1_1,j_r2_1,j_i1_1,j_i2_1;
+		//double j_r1_0,j_r2_0,j_i1_0,j_i2_0,j_r1_1,j_r2_1,j_i1_1,j_i2_1;
 		int time_id_1;
 		double log_prob_margT_bicorr=-100;
 		double prefactor = log(detMprime);
@@ -570,4 +556,532 @@ void coherent_skymap_bicorr(
 
 	DestroyCOMPLEX16TimeSeriesList(snr_list,Ndet);
 
+}
+
+
+/*
+Coherent localization skymap with bimodal correlated-digonal prior.
+See arXiv:2110.01874.
+This function uses the max-snr detector's timestamp as the time parameter to be marginalized,
+rather than geocent time tc. This is more robust in real detection in which true tc is unknown.
+max_snr_det_id is used to label the detector - from 0,1,2, rather than LAL det code.
+*/
+void coherent_skymap_bicorr_usetimediff(
+				double *coh_skymap_bicorr, // The probability skymap we want to return
+				const double *time_arrays,
+				const double complex *snr_arrays,
+				const int *detector_codes,
+				const double *sigmas,
+				const int *ntimes,
+				const int Ndet,
+				//const double *ra_grids,
+				//const double *dec_grids,
+				const int *argsort_pix_id,
+				const int nside,
+				const int ngrid,
+				const double start_time,
+				const double end_time,
+				const int ntime_interp,
+                const double prior_mu,
+                const double prior_sigma,
+				const int nthread,
+				const int interp_order,
+				const int max_snr_det_id)
+{
+	int grid_id,time_id,det_id;
+
+	double dt = (end_time-start_time)/ntime_interp;
+	double ref_gps_time = (start_time + end_time)/2.0;
+
+	COMPLEX16TimeSeries ** snr_list = CreateCOMPLEX16TimeSeriesList(time_arrays, snr_arrays, Ndet, ntimes);
+
+	LALDetector tempdet, detectors[Ndet];
+	for(det_id=0; det_id<Ndet; det_id++){
+		tempdet = lalCachedDetectors[detector_codes[det_id]];
+		detectors[det_id] = tempdet;
+	}
+
+	LIGOTimeGPS ligo_gps_time;
+	ligo_gps_time.gpsSeconds = (int)(ref_gps_time);
+	ligo_gps_time.gpsNanoSeconds = (ref_gps_time-(int)(ref_gps_time)) * 1E9;
+
+
+	double mu_multimodal = prior_mu;
+	double sigma_multimodal = prior_sigma;
+	double xi = 1/sigma_multimodal/sigma_multimodal;
+	double alpha = mu_multimodal*xi;
+	#pragma omp parallel num_threads(nthread) private(time_id,det_id)  shared(coh_skymap_bicorr,snr_list,detectors)
+	{
+	#pragma omp for
+	for(grid_id=0;grid_id<ngrid;grid_id+=1){
+		coh_skymap_bicorr[grid_id]=0;
+
+		double Gsigma[2*Ndet];
+		double M[4];
+
+		//set parameters
+		//double ra  = ra_grids[grid_id];
+		//double dec = dec_grids[grid_id];
+		double ra, dec;
+		pix2ang_nest64(nside, argsort_pix_id[grid_id], &dec, &ra);
+		dec = M_PI/2 - dec;
+
+		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
+		//Calculate M
+		calcM(Gsigma, Ndet, M);
+		//Calculate M'^{-1} and M0'^{-1}
+        double M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22;
+		double aa = M[0] + M[3] + xi;
+        double bb = 2*M[1];
+        double cc = 2*M[2];
+        double dd = M[3] + M[0] + xi;
+        double detMprime = aa*dd - bb*cc;
+        M_inverse_11 = dd/(aa*dd-bb*cc);
+        M_inverse_12 = -cc/(aa*dd-bb*cc);
+        M_inverse_21 = -bb/(aa*dd-bb*cc);
+        M_inverse_22 = aa/(aa*dd-bb*cc);
+
+        double M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22;
+		double aa0 = M[0] + M[3] + xi;
+        double dd0 = aa0;
+        double detM0prime = aa0*dd0;
+        M0_inverse_11 = 1.0/aa0;
+        M0_inverse_12 = 0.0;
+        M0_inverse_21 = 0.0;
+        M0_inverse_22 = 1.0/dd0;
+
+		double log_exp_term;
+		//double log_exp_term0,log_exp_term1;
+		double j_r1,j_r2,j_i1,j_i2;
+		//double j_r1_0,j_r2_0,j_i1_0,j_i2_0,j_r1_1,j_r2_1,j_i1_1,j_i2_1;
+		int time_id_1;
+		double log_prob_margT_bicorr=-100;
+		double prefactor = log(detMprime);
+		double prefactor0 = log(detM0prime);
+
+		//transform matched filtering snr to j stream
+		double time_shifts[Ndet];
+		double time_shift;
+		double complex data;
+		double complex data0,data1;
+		double max_snr_det_dt = XLALTimeDelayFromEarthCenter((detectors[max_snr_det_id]).location,ra,dec,&ligo_gps_time);
+		for(det_id=0;det_id<Ndet;det_id++){
+			if(det_id==max_snr_det_id){
+				time_shifts[det_id] = 0.0;
+			}
+			else{
+				time_shifts[det_id] = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time)-max_snr_det_dt;
+			}
+		}
+
+		// without loop unrolling
+		for(time_id=0;time_id<ntime_interp;time_id++){
+			j_r1 = 0;
+			j_r2 = 0;
+			j_i1 = 0;
+			j_i2 = 0;
+
+			for(det_id=0;det_id<Ndet;det_id++){
+				time_shift = time_shifts[det_id];
+				data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
+
+				j_r1 += creal(data)*Gsigma[2*det_id];
+				j_i1 += cimag(data)*Gsigma[2*det_id];
+				j_r2 += creal(data)*Gsigma[2*det_id+1];
+				j_i2 += cimag(data)*Gsigma[2*det_id+1];
+
+			}
+
+			log_exp_term = calcExpterm(j_r1, j_r2,j_i1, j_i2,
+				alpha, prefactor, prefactor0,
+				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22,
+				M0_inverse_11, M0_inverse_12, M0_inverse_21, M0_inverse_22);
+
+			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term);
+		}
+
+		// with 2x loop unrolling, 10-20% faster for one thread, but slower for multithreads.
+		/*for(time_id=0;time_id<ntime_interp/2;time_id++){
+			j_r1_0 = 0;
+			j_r2_0 = 0;
+			j_i1_0 = 0;
+			j_i2_0 = 0;
+
+			j_r1_1 = 0;
+			j_r2_1 = 0;
+			j_i1_1 = 0;
+			j_i2_1 = 0;
+
+			time_id_1 = ntime_interp-time_id-1;
+
+			for(det_id=0;det_id<Ndet;det_id++){
+				time_shift = time_shifts[det_id];
+				data0 = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
+				data1 = interpolate_time_series(snr_list[det_id], start_time + time_id_1*dt + time_shift, interp_order);
+
+				j_r1_0 += creal(data0)*Gsigma[2*det_id];
+				j_i1_0 += cimag(data0)*Gsigma[2*det_id];
+				j_r2_0 += creal(data0)*Gsigma[2*det_id+1];
+				j_i2_0 += cimag(data0)*Gsigma[2*det_id+1];
+
+				j_r1_1 += creal(data1)*Gsigma[2*det_id];
+				j_i1_1 += cimag(data1)*Gsigma[2*det_id];
+				j_r2_1 += creal(data1)*Gsigma[2*det_id+1];
+				j_i2_1 += cimag(data1)*Gsigma[2*det_id+1];
+
+			}
+
+			log_exp_term0 = calcExpterm(j_r1_0, j_r2_0,j_i1_0, j_i2_0,
+				alpha, prefactor, prefactor0,
+				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22,
+				M0_inverse_11, M0_inverse_12, M0_inverse_21, M0_inverse_22);
+
+			log_exp_term1 = calcExpterm(j_r1_1, j_r2_1,j_i1_1, j_i2_1,
+				alpha, prefactor, prefactor0,
+				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22,
+				M0_inverse_11, M0_inverse_12, M0_inverse_21, M0_inverse_22);
+
+			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term0);
+			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term1);
+		}*/
+
+		coh_skymap_bicorr[grid_id] = log_prob_margT_bicorr;
+	} // end of for(grid_id)
+	} // end of omp
+	//DestroyCOMPLEX16TimeSeriesList(snr_list,Ndet);
+}
+
+/*
+Coherent localization skymap with bimodal correlated-digonal prior.
+See arXiv:2110.01874.
+This function uses the max-snr detector's timestamp as the time parameter to be marginalized,
+rather than geocent time tc. This is more robust in real detection in which true tc is unknown.
+max_snr_det_id is used to label the detector - from 0,1,2, rather than LAL det code.
+This function is for internal use. To call this in python, use coherent_skymap_bicorr_usetimediff.
+*/
+void _coherent_skymap_bicorr(
+				double *coh_skymap_bicorr, // The probability skymap we want to return
+				const double *time_arrays,
+				COMPLEX16TimeSeries **snr_list,
+				LALDetector *detectors,
+				const double *sigmas,
+				const int *ntimes,
+				const int Ndet,
+				const int *argsort_pix_id,
+				const int nside,
+				const int ngrid,
+				const double start_time,
+				const double end_time,
+				const int ntime_interp,
+                const double prior_mu,
+                const double prior_sigma,
+				const int nthread,
+				const int interp_order,
+				const int max_snr_det_id,
+				const int use_timediff)
+{
+	int grid_id,time_id,det_id;
+
+	double dt = (end_time-start_time)/ntime_interp;
+	double ref_gps_time = (start_time + end_time)/2.0;
+
+	LIGOTimeGPS ligo_gps_time;
+	ligo_gps_time.gpsSeconds = (int)(ref_gps_time);
+	ligo_gps_time.gpsNanoSeconds = (ref_gps_time-(int)(ref_gps_time)) * 1E9;
+
+
+	double mu_multimodal = prior_mu;
+	double sigma_multimodal = prior_sigma;
+	double xi = 1/sigma_multimodal/sigma_multimodal;
+	double alpha = mu_multimodal*xi;
+	#pragma omp parallel num_threads(nthread) private(time_id,det_id)  shared(coh_skymap_bicorr,snr_list,detectors)
+	{
+	#pragma omp for
+	for(grid_id=0;grid_id<ngrid;grid_id+=1){
+		coh_skymap_bicorr[grid_id]=0;
+
+		double Gsigma[2*Ndet];
+		double M[4];
+
+		double ra, dec;
+		pix2ang_nest64(nside, argsort_pix_id[grid_id], &dec, &ra);
+		dec = M_PI/2 - dec;
+
+		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
+		//Calculate M
+		calcM(Gsigma, Ndet, M);
+		//Calculate M'^{-1} and M0'^{-1}
+        double M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22;
+		double aa = M[0] + M[3] + xi;
+        double bb = 2*M[1];
+        double cc = 2*M[2];
+        double dd = M[3] + M[0] + xi;
+        double detMprime = aa*dd - bb*cc;
+        M_inverse_11 = dd/(aa*dd-bb*cc);
+        M_inverse_12 = -cc/(aa*dd-bb*cc);
+        M_inverse_21 = -bb/(aa*dd-bb*cc);
+        M_inverse_22 = aa/(aa*dd-bb*cc);
+
+        double M0_inverse_11,M0_inverse_12,M0_inverse_21,M0_inverse_22;
+		double aa0 = M[0] + M[3] + xi;
+        double dd0 = aa0;
+        double detM0prime = aa0*dd0;
+        M0_inverse_11 = 1.0/aa0;
+        M0_inverse_12 = 0.0;
+        M0_inverse_21 = 0.0;
+        M0_inverse_22 = 1.0/dd0;
+
+		double log_exp_term;
+		double j_r1,j_r2,j_i1,j_i2;
+		int time_id_1;
+		double log_prob_margT_bicorr=-100;
+		double prefactor = log(detMprime);
+		double prefactor0 = log(detM0prime);
+
+		//transform matched filtering snr to j stream
+		double time_shifts[Ndet];
+		double time_shift;
+		double complex data;
+		double complex data0,data1;
+		double max_snr_det_dt = XLALTimeDelayFromEarthCenter((detectors[max_snr_det_id]).location,ra,dec,&ligo_gps_time);
+		double dt_ref=0.0;
+		if (use_timediff){dt_ref = max_snr_det_dt;}
+
+		for(det_id=0;det_id<Ndet;det_id++){
+			if(det_id==max_snr_det_id){
+				time_shifts[det_id] = max_snr_det_dt-dt_ref;
+			}
+			else{
+				time_shifts[det_id] = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time)-dt_ref;
+			}
+		}
+
+		// without loop unrolling
+		for(time_id=0;time_id<ntime_interp;time_id++){
+			j_r1 = 0;
+			j_r2 = 0;
+			j_i1 = 0;
+			j_i2 = 0;
+
+			for(det_id=0;det_id<Ndet;det_id++){
+				time_shift = time_shifts[det_id];
+				data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
+
+				j_r1 += creal(data)*Gsigma[2*det_id];
+				j_i1 += cimag(data)*Gsigma[2*det_id];
+				j_r2 += creal(data)*Gsigma[2*det_id+1];
+				j_i2 += cimag(data)*Gsigma[2*det_id+1];
+
+			}
+
+			log_exp_term = calcExpterm(j_r1, j_r2,j_i1, j_i2,
+				alpha, prefactor, prefactor0,
+				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22,
+				M0_inverse_11, M0_inverse_12, M0_inverse_21, M0_inverse_22);
+
+			log_prob_margT_bicorr = logsumexp(log_prob_margT_bicorr,log_exp_term);
+		}
+
+		coh_skymap_bicorr[grid_id] = log_prob_margT_bicorr;
+	} // end of for(grid_id)
+	} // end of omp
+}
+
+
+// Comparison function for qsort in descending order
+int compare_descending(const void *a, const void *b) {
+    double val_a = *(const double *)a;
+    double val_b = *(const double *)b;
+
+    if (val_a > val_b) {
+        return -1;
+    } else if (val_a < val_b) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+int *rank_OneOfFour(const double *array, int length) {
+    if (length % 4 != 0) {
+        printf("Array size doesn't fit\n");
+        exit(-1);
+    }
+
+    int i, j = 0, sum = 0;
+    int quarter_length = length / 4;
+    int *argsort = (int *)malloc(sizeof(int) * length);
+    double *sorted_array = (double *)malloc(sizeof(double) * length);
+
+    // Copy the input array to a new array for sorting
+    memcpy(sorted_array, array, sizeof(double) * length);
+
+    // Sort the new array in descending order
+    qsort(sorted_array, length, sizeof(double), compare_descending);
+
+    // Find the threshold value at the quarter_length position
+    double threshold = sorted_array[quarter_length - 1];
+
+    // Fill the argsort array with indices of elements greater than or equal to the threshold
+    for (i = 0; i < length; i++) {
+        if (array[i] >= threshold) {
+            argsort[sum] = i;
+            sum++;
+        }
+    }
+
+    int *argsort_final = (int *)malloc(sizeof(int) * quarter_length);
+    for (i = 0; i < quarter_length; i++) {
+        argsort_final[i] = argsort[i];
+    }
+    free(argsort);
+    free(sorted_array);
+
+    return argsort_final;
+}
+
+
+
+void create_healpix_skygrids(int nside, double *ra_grids, double *dec_grids){
+	int i;
+	int npix = 12*nside*nside;
+	for(i=0;i<npix;i++){
+		pix2ang_nest64(nside, i, &dec_grids[i], &ra_grids[i]);
+		dec_grids[i] = M_PI/2 - dec_grids[i];
+	}
+}
+
+void normalize_log_probs(int npix, double *log_probs){
+	double maxlogprob = -10000;
+	double sum = 0;
+	int i;
+
+	// Find the maximum log probability
+	#pragma omp parallel for reduction(max:maxlogprob)
+	for(i = 0; i < npix; i++){
+		if(log_probs[i] > maxlogprob){
+			maxlogprob = log_probs[i];
+		}
+	}
+
+	// Exponentiate and sum the probabilities
+	#pragma omp parallel for reduction(+:sum)
+	for(i = 0; i < npix; i++){
+		log_probs[i] = exp(log_probs[i] - maxlogprob);
+		sum += log_probs[i];
+	}
+
+	// Normalize the probabilities
+	double inv_sum = 1.0 / sum;
+	#pragma omp parallel for
+	for(i = 0; i < npix; i++){
+		log_probs[i] *= inv_sum;
+	}
+}
+
+void coherent_skymap_multires_bicorr(
+	double *coh_skymap_multires_bicorr, // The probability skymap we want to return
+	const double *time_arrays,
+	const double complex *snr_arrays,
+	const int *detector_codes,
+	const double *sigmas,
+	const int *ntimes,
+	const int Ndet,
+	const double start_time,
+	const double end_time,
+	const int ntime_interp,
+	const double prior_mu,
+	const double prior_sigma,
+	const int nthread,
+	const int interp_order,
+	const int max_snr_det_id,
+	const int nlevel,
+	const int use_timediff)
+{
+	int i,j,i_level;
+	int nside_base = 16;
+	int npix_base  = 12*nside_base*nside_base;
+
+	int nside_final = nside_base*pow(2,nlevel);
+	int npix_final = 12*nside_final*nside_final;
+
+	double *coh_skymap = (double*)malloc(sizeof(double)*npix_base);
+	//initialize the argsort
+	int *argsort        = (int*)malloc(sizeof(int)*npix_base/4);
+	int *argsort_temp   = (int*)malloc(sizeof(int)*npix_base/4);
+	int *argsort_pix_id = (int*)malloc(sizeof(int)*npix_base);
+	for(i=0;i<npix_base/4;i++){
+		argsort[i] = i;
+		for(j=0;j<4;j++){
+			argsort_pix_id[i*4+j] = i*4+j;
+		}
+	}
+
+	// pre-process data
+	COMPLEX16TimeSeries ** snr_list = CreateCOMPLEX16TimeSeriesList(time_arrays, snr_arrays, Ndet, ntimes);
+	LALDetector tempdet, detectors[Ndet];
+	int det_id;
+	for(det_id=0; det_id<Ndet; det_id++){
+		tempdet = lalCachedDetectors[detector_codes[det_id]];
+		detectors[det_id] = tempdet;
+	}
+
+	for(i_level=0;i_level<nlevel+1;i_level++){
+		int i_nside = nside_base*pow(2,i_level);
+		int i_npix  = 12*i_nside*i_nside;
+		//calculate skymap
+		_coherent_skymap_bicorr(
+				coh_skymap, // The probability skymap we want to return
+				time_arrays,
+				snr_list,
+				detectors,
+				sigmas,
+				ntimes,
+				Ndet,
+				argsort_pix_id,
+				i_nside,
+				npix_base,
+				start_time,
+				end_time,
+				ntime_interp,
+				prior_mu,
+				prior_sigma,
+				nthread,
+				interp_order,
+				max_snr_det_id,
+				use_timediff);
+
+
+		//update skymap
+		int nfactor = (int)pow(4,nlevel-i_level);
+		int index;
+		for(i=0;i<npix_base;i++){
+			index = argsort_pix_id[i];
+			for(j=0;j<nfactor;j++){
+				coh_skymap_multires_bicorr[index*nfactor+j] = coh_skymap[i];
+			}
+		}
+
+		if(i_level<nlevel+1){
+			argsort = rank_OneOfFour(coh_skymap,npix_base);
+			for(i=0;i<npix_base/4;i++){
+				argsort_temp[i] = argsort_pix_id[argsort[i]];
+			}
+
+			// new pixel ids for the next loop
+			for(i=0;i<npix_base/4;i++){
+				for(j=0;j<4;j++){
+					argsort_pix_id[i*4+j] = argsort_temp[i]*4+j;
+				}
+			}
+		}
+
+	} // end of multires loop
+
+	normalize_log_probs(npix_final, coh_skymap_multires_bicorr);
+
+	free(argsort);
+	free(argsort_temp);
+	free(argsort_pix_id);
+	free(coh_skymap);
+	DestroyCOMPLEX16TimeSeriesList(snr_list,Ndet);
 }

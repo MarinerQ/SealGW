@@ -49,7 +49,7 @@ def read_event_info(filepath):
     return trigger_time, ndet, det_codes, snrs, sigmas
 
 
-def extract_info_from_xml(filepath, return_names=False):
+def extract_info_from_xml(filepath, return_names=False, use_timediff=True):
     import spiir.io.ligolw
 
     xmlfile = spiir.io.ligolw.load_coinc_xml(filepath)
@@ -86,6 +86,8 @@ def extract_info_from_xml(filepath, return_names=False):
     sigma_array = deff_array * max_snr_array
     trigger_time = trigger_time / len(det_names)  # mean of trigger times of each det
 
+    if use_timediff:
+        trigger_time = time_array[np.argmax(abs(snr_array))]
     logger.debug("xml processing done. ")
     logger.debug(f"Trigger time: {trigger_time}")
     logger.debug(f"Detectors: {det_names}")
@@ -135,6 +137,7 @@ def deg2perpix(nlevel):
     nlevel = 4, nside = 256, npix = 786432, deg2 per pixel = 0.052455902099609375
     nlevel = 5, nside = 512, npix = 3145728, deg2 per pixel = 0.013113975524902344
     nlevel = 6, nside = 1024, npix = 12582912, deg2 per pixel = 0.003278493881225586
+    nlevel = 7, nside = 2048, npix = 50331648, deg2 per pixel = 0.0008196226755777994
     """
     nside_base = 16
     nside = nside_base * 2**nlevel
@@ -142,6 +145,16 @@ def deg2perpix(nlevel):
     deg2perpix = 41252.96 / npix
 
     return deg2perpix
+
+
+def normalize_log_probabilities(log_probs: np.ndarray) -> np.ndarray:
+    """Converts log probabilities into a normalized probability array."""
+    max_log_prob = np.max(log_probs)
+    np.subtract(log_probs, max_log_prob, out=log_probs)
+    np.exp(log_probs, out=log_probs)
+    sum_probs = np.sum(log_probs)
+    np.divide(log_probs, sum_probs, out=log_probs)
+    return log_probs
 
 
 def seal_with_adaptive_healpix(
@@ -158,7 +171,73 @@ def seal_with_adaptive_healpix(
     prior_mu,
     prior_sigma,
     nthread,
+    max_snr_det_id,
     interp_order=0,
+    use_timediff=True,
+):
+
+    # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
+    # Adaptive healpix: see Bayestar paper (and our seal paper).
+
+    nside_base = 16
+    nside_final = nside_base * 2**nlevel  # 16 *  [1,4,16,...,2^6]
+    npix_final = 12 * nside_final**2  # 12582912 for nlevel=6
+
+    # ra, dec = generate_healpix_grids(nside_final)
+    skymap_multires = np.zeros(npix_final)
+
+    dts = [
+        time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
+        for detid in range(ndet)
+    ]
+    ntime_interp = int(interp_factor * (end_time - start_time) / min(dts))
+    if use_timediff:
+        use_timediff = 1
+    else:
+        use_timediff = 0
+    sealcore.Pycoherent_skymap_multires_bicorr(
+        skymap_multires,
+        time_arrays,
+        snr_arrays,
+        det_code_array,
+        sigma_array,
+        ntimes_array,
+        ndet,
+        start_time,
+        end_time,
+        ntime_interp,
+        prior_mu,
+        prior_sigma,
+        nthread,
+        interp_order,
+        max_snr_det_id,
+        nlevel,
+        use_timediff,
+    )
+
+    # return normalize_log_probabilities(skymap_multires)
+    return skymap_multires
+
+
+'''
+# Multi resolution in python, slower than pure C, especially when nlevel > 5.
+def seal_with_adaptive_healpix(
+    nlevel,
+    time_arrays,
+    snr_arrays,
+    det_code_array,
+    sigma_array,
+    ntimes_array,
+    ndet,
+    start_time,
+    end_time,
+    interp_factor,
+    prior_mu,
+    prior_sigma,
+    nthread,
+    max_snr_det_id,
+    interp_order=0,
+    use_timediff=True,
 ):
 
     # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
@@ -174,61 +253,90 @@ def seal_with_adaptive_healpix(
 
     # let n_time be aligned with the finest sampled detector
     # (as we allow different sampling rates)
-    dts = []
-    for detid in range(ndet):
-        dts.append(
-            time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
-        )
+    # dts = []
+    # for detid in range(ndet):
+    #    dts.append(
+    #        time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
+    #    )
+    dts = [
+        time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
+        for detid in range(ndet)
+    ]
     ntime_interp = int(interp_factor * (end_time - start_time) / min(dts))
 
     # Initialize argsort
     argsort = np.arange(npix_base / 4)
     argsort_pix_id = np.arange(npix_base)
-
+    t0 = time.time()
     for ilevel in range(nlevel + 1):
+        t1 = time.time()
         iside = nside_base * 2**ilevel
         # ipix = 12 * iside**2
-        ra_for_this_level, dec_for_this_level = generate_healpix_grids(
-            iside
-        )  # len(ra_for_this_level) == ipix
+        #ra_for_this_level, dec_for_this_level = generate_healpix_grids(
+        #    iside
+        #)  # len(ra_for_this_level) == ipix
 
         # Calculate the first 1/4 most probable grids from previous level
-        ra_to_calculate = ra_for_this_level[
-            argsort_pix_id
-        ]  # len(ra_to_calculate) == npix_base
-        dec_to_calculate = dec_for_this_level[argsort_pix_id]
+        # len(ra_to_calculate) == npix_base
+        #ra_to_calculate = ra_for_this_level[argsort_pix_id]
+        #dec_to_calculate = dec_for_this_level[argsort_pix_id]
 
         # Calculate skymap (of log prob density)
         coh_skymap_for_this_level = np.zeros(npix_base)
-        # t1=time.time()
-        sealcore.Pycoherent_skymap_bicorr(
-            coh_skymap_for_this_level,
-            time_arrays,
-            snr_arrays,
-            det_code_array,
-            sigma_array,
-            ntimes_array,
-            ndet,
-            ra_to_calculate,
-            dec_to_calculate,
-            npix_base,
-            start_time,
-            end_time,
-            ntime_interp,
-            prior_mu,
-            prior_sigma,
-            nthread,
-            interp_order,
-        )
-        # t2=time.time()
-        # print(f'time cost of calculating skymap: {t2-t1}')
+        t2 = time.time()
+        print(f'prepare time {t2-t1}')
+        if use_timediff:
+            sealcore.Pycoherent_skymap_bicorr_usetimediff(
+                coh_skymap_for_this_level,
+                time_arrays,
+                snr_arrays,
+                det_code_array,
+                sigma_array,
+                ntimes_array,
+                ndet,
+                #ra_to_calculate,
+                #dec_to_calculate,
+                argsort_pix_id.astype(ctypes.c_int32),
+                iside,
+                npix_base,
+                start_time,
+                end_time,
+                ntime_interp,
+                prior_mu,
+                prior_sigma,
+                nthread,
+                interp_order,
+                max_snr_det_id,
+            )
+        else:
+            sealcore.Pycoherent_skymap_bicorr(
+                coh_skymap_for_this_level,
+                time_arrays,
+                snr_arrays,
+                det_code_array,
+                sigma_array,
+                ntimes_array,
+                ndet,
+                ra_to_calculate,
+                dec_to_calculate,
+                npix_base,
+                start_time,
+                end_time,
+                ntime_interp,
+                prior_mu,
+                prior_sigma,
+                nthread,
+                interp_order,
+            )
+        t3 = time.time()
+        print(f'time cost of calculating skymap: {t3-t2}')
         # Update skymap
         nfactor = 4 ** (
             nlevel - ilevel
         )  # map a pixel of this level to multiple pixels in the final level
 
         if ilevel == 0 or ilevel == 1:
-            for i in range(npix_base):  # Can we avoid this loop? It's 3072 times.
+            for i in range(npix_base):
                 index = argsort_pix_id[i]
                 skymap_multires[
                     index * nfactor : (index + 1) * nfactor
@@ -247,11 +355,16 @@ def seal_with_adaptive_healpix(
         argsort_temp = argsort_pix_id[argsort]
 
         for j in range(4):
-            argsort_pix_id[j::4] = (
-                argsort_temp * 4 + j
-            )  # map to next-level grids-to-calculate
-
+            # map to next-level grids-to-calculate
+            argsort_pix_id[j::4] = argsort_temp * 4 + j
+        t4 = time.time()
+        print(f'time cost of updating skymap: {t4-t3}')
+    tn = time.time()
+    print(f'all loops time: {tn-t0}')
+    skymap_multires = normalize_log_probabilities(skymap_multires)
+    print(f'norm time: {time.time()-tn}')
     return skymap_multires
+'''
 
 
 def get_det_code_array(det_name_list):
@@ -266,7 +379,7 @@ def get_det_code_array(det_name_list):
 
 
 def plot_skymap(
-    log_probs: np.ndarray,
+    probs: np.ndarray,
     save_filename: Optional[str] = None,
     true_ra: float = None,
     true_dec: float = None,
@@ -275,11 +388,8 @@ def plot_skymap(
     title: Optional[str] = None,
     figsize: Tuple[float, float] = (14, 7),
 ) -> Figure:
-    """Plots a localisation skymap using from a log probability density array."""
+    """Plots a localisation skymap using from a probability density array."""
     import spiir.search.skymap
-
-    # normalise probability skymap
-    skymap = normalize_log_probabilities(log_probs)
 
     # add ground truth marker if both ra and dec are not None
     ground_truth = None
@@ -295,7 +405,7 @@ def plot_skymap(
         inset_kwargs = None
 
     fig = spiir.search.skymap.plot_skymap(
-        skymap,
+        probs,
         contours=[50, 90],
         ground_truth=ground_truth,
         colorbar=False,
@@ -311,32 +421,49 @@ def plot_skymap(
     return fig
 
 
-def normalize_log_probabilities(log_probs: np.ndarray) -> np.ndarray:
-    """Converts log probabilities into a normalized probability array."""
-    probs = np.exp(log_probs - max(log_probs))
-    probs /= sum(probs)
-    return probs
-
-
-def confidence_area(log_probs, confidence_level):
+def apply_fudge_factor(probs: np.ndarray, fudge_percent: float) -> np.ndarray:
     """
-    skymap: log prob skymap
+    Apply a fudge factor to a probability healpix skymap to renormalize the probabilities.
+    The fudge factor is determined by experiment to adjust 90% area.
+
+    e.g., if 95% area gets 90% simulations right, the fudge_percent 0.95. The top 95% of prob skymap
+    will be multiplied by 90/95 so that it becomes 90% area.
+
+    """
+    # Find the top values that summed up to 0.9 in probs
+    sorted_probs = np.sort(probs)[::-1]
+    cumulative_probs = np.cumsum(sorted_probs)
+    index_90 = np.searchsorted(cumulative_probs, fudge_percent)
+    top_90_probs_mask = probs >= sorted_probs[index_90]
+
+    # Apply fudge factor
+    fudge_factor = 0.9 / fudge_percent
+    fudge_facto4norm = 0.1 / (1 - fudge_percent)
+    fudge_factored_probs = np.where(
+        top_90_probs_mask, probs * fudge_factor, probs * fudge_facto4norm
+    )
+    fudge_factored_probs /= np.sum(fudge_factored_probs)
+
+    return fudge_factored_probs
+
+
+def confidence_area(probs, confidence_level):
+    """
+    skymap: probability skymap
     confidence_level: float or array
 
     returns confidence area at given confidence lvel.
     """
-    skymap = normalize_log_probabilities(log_probs)
-
-    nside = ah.npix_to_nside(len(skymap))
+    nside = ah.npix_to_nside(len(probs))
     deg2perpix = ah.nside_to_pixel_area(nside).to_value(u.deg**2)
 
-    credible_levels = 100 * postprocess.find_greedy_credible_levels(skymap)
+    credible_levels = 100 * postprocess.find_greedy_credible_levels(probs)
     area = np.searchsorted(np.sort(credible_levels), confidence_level) * deg2perpix
 
     return area
 
 
-def cumulative_percentage(log_probs, ra, dec):
+def cumulative_percentage(probs, ra, dec):
     """
     Find cumulative percentage at (ra, dec).
 
@@ -344,65 +471,59 @@ def cumulative_percentage(log_probs, ra, dec):
 
     When reach the lowest prob pixel, prob accumulate to one.
     """
-    skymap = normalize_log_probabilities(log_probs)
-
     theta = np.pi / 2 - dec
     phi = ra
 
-    nside = ah.npix_to_nside(len(skymap))  # confirm this is the correct nside
+    nside = ah.npix_to_nside(len(probs))  # confirm this is the correct nside
     pixel_index = hp.pixelfunc.ang2pix(nside, theta, phi, nest=True)
 
-    prob_here = skymap[pixel_index]
-    larger_prob_index = np.where(skymap > prob_here)[0]
+    prob_here = probs[pixel_index]
+    larger_prob_index = np.where(probs > prob_here)[0]
 
-    percentage = sum(skymap[larger_prob_index])
+    percentage = sum(probs[larger_prob_index])
 
     return percentage
 
 
-def search_area(log_probs, ra, dec):
+def search_area(probs, ra, dec):
     """
     Find cumulative search area at (ra, dec), search from the highest pixel.
 
     When reach the lowest prob pixel, prob accumulate to one.
     """
-    skymap = normalize_log_probabilities(log_probs)
-
-    nside = ah.npix_to_nside(len(skymap))
+    nside = ah.npix_to_nside(len(probs))
     deg2perpix = ah.nside_to_pixel_area(nside).to_value(u.deg**2)
 
     theta = np.pi / 2 - dec
     phi = ra
     pixel_index = hp.pixelfunc.ang2pix(nside, theta, phi, nest=True)
 
-    prob_here = skymap[pixel_index]
-    larger_prob_index = np.where(skymap > prob_here)[0]
+    prob_here = probs[pixel_index]
+    larger_prob_index = np.where(probs > prob_here)[0]
 
     area = len(larger_prob_index) * deg2perpix
 
     return area
 
 
-def catalog_test_statistics(log_probs, ra_inj, dec_inj):
+def catalog_test_statistics(probs, ra_inj, dec_inj):
     """
     return all statistics that catalog test needs.
     """
-    skymap = normalize_log_probabilities(log_probs)
-
-    nside = ah.npix_to_nside(len(skymap))
+    nside = ah.npix_to_nside(len(probs))
     deg2perpix = ah.nside_to_pixel_area(nside).to_value(u.deg**2)
 
     theta = np.pi / 2 - dec_inj
     phi = ra_inj
     pixel_index = hp.pixelfunc.ang2pix(nside, theta, phi, nest=True)
 
-    prob_here = skymap[pixel_index]
-    larger_prob_index = np.where(skymap > prob_here)[0]
+    prob_here = probs[pixel_index]
+    larger_prob_index = np.where(probs > prob_here)[0]
 
-    inj_point_cumulative_percentage = sum(skymap[larger_prob_index])
+    inj_point_cumulative_percentage = sum(probs[larger_prob_index])
     search_area = len(larger_prob_index) * deg2perpix
 
-    credible_levels = 100 * postprocess.find_greedy_credible_levels(skymap)
+    credible_levels = 100 * postprocess.find_greedy_credible_levels(probs)
     levels = [50, 90]
     confidence_areas = np.searchsorted(np.sort(credible_levels), levels) * deg2perpix
 

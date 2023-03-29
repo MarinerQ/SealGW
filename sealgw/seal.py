@@ -150,7 +150,7 @@ class Seal:
             )
             if source_type in ['BNS', 'NSBH']:
                 horizon = horizon * 0.6  # get more high SNR samples for fitting
-            logger.debug(
+            logger.warning(
                 f"Warning: Max luminosity distance is not provided. Using {horizon}Mpc."
             )
             samples = get_fitting_source_para_sample(
@@ -229,9 +229,10 @@ class Seal:
         end_time,
         nthread,
         nlevel=5,
-        interp_factor=10,
+        interp_factor=8,
         interp_order=0,
         timecost=False,
+        use_timediff=True,
     ):
         if not self.initialized:
             raise Exception("Seal not initialized!")
@@ -242,8 +243,12 @@ class Seal:
         prior_mu = self.prior_coef_a * max_snr + self.prior_coef_b
         prior_sigma = self.prior_coef_c * max_snr + self.prior_coef_d
 
+        max_snr_index = np.argmax(abs(snr_arrays))
+        cumulative_ntimes = np.cumsum(ntimes)
+        max_snr_det_id = np.searchsorted(cumulative_ntimes, max_snr_index)
+
         time1 = time.time()
-        log_prob_skymap = seal_with_adaptive_healpix(
+        prob_skymap = seal_with_adaptive_healpix(
             nlevel,
             time_arrays,
             snr_arrays,
@@ -257,14 +262,16 @@ class Seal:
             prior_mu,
             prior_sigma,
             nthread,
+            max_snr_det_id,
             interp_order,
+            use_timediff,
         )
         time2 = time.time()
 
         if timecost:
-            return log_prob_skymap, time2 - time1
+            return prob_skymap, time2 - time1
         else:
-            return log_prob_skymap
+            return prob_skymap
 
     def localize_with_spiir_xml(
         self,
@@ -272,10 +279,12 @@ class Seal:
         nthread,
         start_time,
         end_time,
+        max_snr_det_id=-1,
         nlevel=5,
         interp_factor=10,
         interp_order=0,
         timecost=False,
+        use_timediff=True,
     ):
         if not self.initialized:
             raise Exception("Seal not initialized!")
@@ -296,8 +305,10 @@ class Seal:
         prior_mu = self.prior_coef_a * max_snr + self.prior_coef_b
         prior_sigma = self.prior_coef_c * max_snr + self.prior_coef_d
 
+        max_snr_det_id = np.argmax(max_snr_array)
+
         time1 = time.time()
-        log_prob_skymap = seal_with_adaptive_healpix(
+        prob_skymap = seal_with_adaptive_healpix(
             nlevel,
             time_arrays,
             snr_arrays,
@@ -311,14 +322,16 @@ class Seal:
             prior_mu,
             prior_sigma,
             nthread,
+            max_snr_det_id,
             interp_order,
+            use_timediff,
         )
         time2 = time.time()
 
         if timecost:
-            log_prob_skymap, time2 - time1
+            prob_skymap, time2 - time1
         else:
-            return log_prob_skymap
+            return prob_skymap
 
     def _catalog_test_kernel(
         self,

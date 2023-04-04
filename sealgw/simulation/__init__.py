@@ -1,1 +1,1 @@
-from . import generating_data, prior_fitting
+from . import generating_data, prior_fitting, sealinterferometers

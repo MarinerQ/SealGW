@@ -246,13 +246,48 @@ def get_inj_paras(
     return inj_paras
 
 
-def premerger_time_to_freq(pre_t, m1, m2):
+def f_of_tau(tau, m1=None, m2=None, mc=None):
     '''
     Maggiore, Gravtational wave, Vol. 1, eqs.(4.20) and (4.21)
     '''
-    mc = (m1 * m2) ** (3 / 5) / (m1 + m2) ** (1 / 5)
-    freq = 134 * (1 / pre_t) ** (3 / 8) * (1.21 / mc) ** (5 / 8)
-    return freq
+    if mc is None:
+        if m1 and m2:
+            mc = (m1 * m2) ** (3 / 5) / (m1 + m2) ** (1 / 5)
+        else:
+            raise ValueError("Mass not provided.")
+
+    f = 134 * (1 / tau) ** (3 / 8) * (1.21 / mc) ** (5 / 8)
+    return f
+
+
+def tau_of_f(f, m1=None, m2=None, mc=None):
+    '''
+    Maggiore, Gravtational wave, Vol. 1, eqs.(4.20) and (4.21)
+    '''
+    if mc is None:
+        if m1 and m2:
+            mc = (m1 * m2) ** (3 / 5) / (m1 + m2) ** (1 / 5)
+        else:
+            raise ValueError("Mass not provided.")
+
+    tau = 2.18 * (1.21 / mc) ** (5 / 3) * (100 / f) ** (8 / 3)
+    return tau
+
+
+def segmentize_tau(tau, timescale):
+    '''
+    Chop tau into many segments based on timescale. Return a list containing the begining index of each segment.
+
+    tau should in descend order
+    '''
+    segment_starts = []
+    current_start = 0
+    for i in range(1, len(tau)):
+        if tau[current_start] - tau[i] > timescale:
+            segment_starts.append(current_start)
+            current_start = i
+    segment_starts.append(current_start)
+    return segment_starts
 
 
 def bns_truncated_fd_bilbypara(
@@ -277,7 +312,7 @@ def bns_truncated_fd_bilbypara(
     mass_1, mass_2 = chirp_mass_and_mass_ratio_to_component_masses(
         chirp_mass, mass_ratio
     )
-    fhigh = np.ceil(premerger_time_to_freq(premerger_time, mass_1, mass_2))
+    fhigh = np.ceil(f_of_tau(premerger_time, m1=mass_1, m2=mass_2))
     deltaf = farray[1] - farray[0]
     approx = 'TaylorF2'  # TaylorF2 IMRPhenomPv2 IMRPhenomPv2_NRTidalv2
     waveform_polarizations = {}
@@ -341,7 +376,7 @@ def bns_truncated_td_bilbypara(
         raise ValueError('duration < premerger_time!')
 
     # to reduce computing time
-    rough_estimation_flow = premerger_time_to_freq(duration, mass_1, mass_2)
+    rough_estimation_flow = f_of_tau(duration, m1=mass_1, m2=mass_2)
     # rough_estimation_flow -= 0.5
 
     deltat = tarray[1] - tarray[0]
@@ -401,7 +436,7 @@ def bns_truncated_fd(
     flow,
     **kwargs
 ):
-    fhigh = np.ceil(premerger_time_to_freq(premerger_time, mass_1, mass_2))
+    fhigh = np.ceil(f_of_tau(premerger_time, m1=mass_1, m2=mass_2))
     deltaf = farray[1] - farray[0]
     approx = 'TaylorF2'  # TaylorF2 IMRPhenomPv2 IMRPhenomPv2_NRTidalv2
     waveform_polarizations = {}
@@ -462,7 +497,7 @@ def bns_truncated_td(
         raise ValueError('duration < premerger_time!')
 
     # to reduce computing time
-    rough_estimation_flow = premerger_time_to_freq(duration, mass_1, mass_2)
+    rough_estimation_flow = f_of_tau(duration, m1=mass_1, m2=mass_2)
     rough_estimation_flow -= 0.5
 
     deltat = tarray[1] - tarray[0]

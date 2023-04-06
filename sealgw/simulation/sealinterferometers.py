@@ -21,6 +21,7 @@ from bilby_cython.geometry import (
 )
 import numpy as np
 from ..calculation.localization import lal_et_response_function
+from .generating_data import f_of_tau, tau_of_f, segmentize_tau
 
 
 class SealInterferometer(Interferometer):
@@ -67,6 +68,8 @@ class SealInterferometer(Interferometer):
         xarm_tilt=0.0,
         yarm_tilt=0.0,
         calibration_model=Recalibrate(),
+        antenna_response_change=False,
+        antenna_response_change_timescale=8.0,
     ):
         """
         Instantiate an SealInterferometer object.
@@ -101,6 +104,10 @@ class SealInterferometer(Interferometer):
         calibration_model: Recalibration
             Calibration model, this applies the calibration correction to the
             template, the default model applies no correction.
+        antenna_response_change: Bool
+            whether consider the change in antenna response functions (i.e. the Earth rotation)
+        antenna_response_change_timescale:
+            time above which antenna_response_change is considered. Only comes to effect when antenna_response_change is True
         """
 
         super().__init__(
@@ -118,6 +125,8 @@ class SealInterferometer(Interferometer):
             yarm_tilt,
             calibration_model,
         )
+        self.antenna_response_change = antenna_response_change
+        self.antenna_response_change_timescale = antenna_response_change_timescale
 
     def antenna_response(self, ra, dec, time, psi, mode):
         """
@@ -159,6 +168,138 @@ class SealInterferometer(Interferometer):
             return 1
         else:
             return 0
+
+    def get_detector_response(
+        self, waveform_polarizations, parameters, frequencies=None
+    ):
+        """Get the detector response for a particular waveform
+
+        Parameters
+        ==========
+        waveform_polarizations: dict
+            polarizations of the waveform
+        parameters: dict
+            parameters describing position and time of arrival of the signal
+        frequencies: array-like, optional
+        The frequency values to evaluate the response at. If
+        not provided, the response is computed using
+        :code:`self.frequency_array`. If the frequencies are
+        specified, no frequency masking is performed.
+        Returns
+        =======
+        array_like: A 3x3 array representation of the detector response (signal observed in the interferometer)
+        """
+        if frequencies is None:
+            frequencies = self.frequency_array[self.frequency_mask]
+            mask = self.frequency_mask
+        else:
+            mask = np.ones(len(frequencies), dtype=bool)
+
+        # !!Assume only low freqs are masked!!
+        # So that masked_index + masked_length = unmasked_index
+        masked_length = len(self.frequency_array) - len(frequencies)
+        signal = {}
+
+        if self.antenna_response_change:
+            try:
+                tau = tau_of_f(frequencies, mc=parameters['chirp_mass'])
+            except:
+                tau = tau_of_f(
+                    frequencies, m1=parameters['mass_1'], m2=parameters['mass_2']
+                )
+            times = parameters['geocent_time'] - tau
+            segment_starts = segmentize_tau(tau, self.antenna_response_change_timescale)
+
+            antenna_response_array_dict = dict()
+            for mode in waveform_polarizations.keys():
+                antenna_response_array_dict[mode] = np.zeros(
+                    len(waveform_polarizations[mode])
+                )
+                for iseg, segment_start in enumerate(segment_starts):
+                    time = times[segment_start]
+                    if iseg < len(segment_starts) - 1:
+                        this_seg_start = segment_start + masked_length
+                        next_seg_start = segment_starts[iseg + 1] + masked_length
+                        length_to_fill = next_seg_start - this_seg_start
+                    else:
+                        this_seg_start = segment_start + masked_length
+                        next_seg_start = None
+                        length_to_fill = (
+                            len(waveform_polarizations[mode]) - this_seg_start
+                        )
+                    antenna_response_array_dict[mode][
+                        this_seg_start:next_seg_start
+                    ] = np.full(
+                        length_to_fill,
+                        self.antenna_response(
+                            parameters['ra'],
+                            parameters['dec'],
+                            time,
+                            parameters['psi'],
+                            mode,
+                        ),
+                    )
+
+                signal[mode] = (
+                    waveform_polarizations[mode] * antenna_response_array_dict[mode]
+                )
+
+            signal_ifo = sum(signal.values()) * mask
+
+            time_shift = np.zeros(len(frequencies))
+            for iseg, segment_start in enumerate(segment_starts):
+                time = times[segment_start]
+                if iseg < len(segment_starts) - 1:
+                    this_seg_start = segment_start
+                    next_seg_start = segment_starts[iseg + 1]
+                    length_to_fill = next_seg_start - this_seg_start
+                else:
+                    this_seg_start = segment_start
+                    next_seg_start = None
+                    length_to_fill = len(frequencies) - this_seg_start
+                time_shift[this_seg_start:next_seg_start] = np.full(
+                    length_to_fill,
+                    self.time_delay_from_geocenter(
+                        parameters['ra'], parameters['dec'], time
+                    ),
+                )
+
+            # Be careful to first subtract the two GPS times which are ~1e9 sec.
+            # And then add the time_shift which varies at ~1e-5 sec
+            dt_geocent = (
+                parameters['geocent_time'] - self.strain_data.start_time
+            )  # not times-?
+
+            dt = dt_geocent + time_shift
+
+        else:
+            for mode in waveform_polarizations.keys():
+                det_response = self.antenna_response(
+                    parameters['ra'],
+                    parameters['dec'],
+                    parameters['geocent_time'],
+                    parameters['psi'],
+                    mode,
+                )
+
+                signal[mode] = waveform_polarizations[mode] * det_response
+            signal_ifo = sum(signal.values()) * mask
+            time_shift = self.time_delay_from_geocenter(
+                parameters['ra'], parameters['dec'], parameters['geocent_time']
+            )
+
+            # Be careful to first subtract the two GPS times which are ~1e9 sec.
+            # And then add the time_shift which varies at ~1e-5 sec
+            dt_geocent = parameters['geocent_time'] - self.strain_data.start_time
+            dt = dt_geocent + time_shift
+
+        signal_ifo[mask] = signal_ifo[mask] * np.exp(-1j * 2 * np.pi * dt * frequencies)
+
+        signal_ifo[mask] *= self.calibration_model.get_calibration_factor(
+            frequencies, prefix='recalib_{}_'.format(self.name), **parameters
+        )
+
+        return signal_ifo
 
 
 class SealTriangularInterferometer(InterferometerList):

@@ -20,7 +20,9 @@ from bilby_cython.geometry import (
     time_delay_from_geocenter,
 )
 import numpy as np
-from ..calculation.localization import lal_et_response_function
+
+# from ..calculation.localization import lal_et_response_function, lal_ce_response_function, lal_dt_function
+from ..calculation.localization import lal_response_function, lal_dt_function
 from .generating_data import f_of_tau, tau_of_f, segmentize_tau
 
 
@@ -157,8 +159,10 @@ class SealInterferometer(Interferometer):
 
         """
         if mode in ["plus", "cross", "x", "y", "breathing", "longitudinal"]:
-            if self.name in ['ET1', 'ET2', 'ET3']:
-                return lal_et_response_function(ra, dec, time, psi, self.name, mode)
+            if self.name in ['ET1', 'ET2', 'ET3', 'CE']:
+                return lal_response_function(ra, dec, time, psi, self.name, mode)
+            # elif self.name == 'CE':
+            #    return lal_ce_response_function(ra, dec, time, psi, mode)
             else:
                 polarization_tensor = get_polarization_tensor(ra, dec, time, psi, mode)
                 return three_by_three_matrix_contraction(
@@ -168,6 +172,30 @@ class SealInterferometer(Interferometer):
             return 1
         else:
             return 0
+
+    def time_delay_from_geocenter(self, ra, dec, time):
+        """
+        Calculate the time delay from the geocenter for the interferometer.
+
+        Use the time delay function from utils.
+
+        Parameters
+        ==========
+        ra: float
+            right ascension of source in radians
+        dec: float
+            declination of source in radians
+        time: float
+            GPS time
+
+        Returns
+        =======
+        float: The time delay from geocenter in seconds
+        """
+        if self.name in ['ET1', 'ET2', 'ET3', 'CE']:
+            return lal_dt_function(ra, dec, time, self.name)
+        else:
+            return time_delay_from_geocenter(self.geometry.vertex, ra, dec, time)
 
     def get_detector_response(
         self, waveform_polarizations, parameters, frequencies=None
@@ -300,6 +328,48 @@ class SealInterferometer(Interferometer):
         )
 
         return signal_ifo
+
+    def inject_signal_from_waveform_polarizations(
+        self, parameters, injection_polarizations, print_para=False
+    ):
+        """Inject a signal into the detector from a dict of waveform polarizations.
+        Alternative to `inject_signal` and `inject_signal_from_waveform_generator`.
+
+        Parameters
+        ==========
+        parameters: dict
+            Parameters of the injection.
+        injection_polarizations: dict
+           Polarizations of waveform to inject, output of
+           `waveform_generator.frequency_domain_strain()`.
+
+        """
+        if not self.strain_data.time_within_data(parameters['geocent_time']):
+            logger.warning(
+                'Injecting signal outside segment, start_time={}, merger time={}.'.format(
+                    self.strain_data.start_time, parameters['geocent_time']
+                )
+            )
+
+        signal_ifo = self.get_detector_response(injection_polarizations, parameters)
+        self.strain_data.frequency_domain_strain += signal_ifo
+
+        self.meta_data['optimal_SNR'] = np.sqrt(
+            self.optimal_snr_squared(signal=signal_ifo)
+        ).real
+        self.meta_data['matched_filter_SNR'] = self.matched_filter_snr(
+            signal=signal_ifo
+        )
+        self.meta_data['parameters'] = parameters
+
+        logger.info("Injected signal in {}:".format(self.name))
+        logger.info("  optimal SNR = {:.2f}".format(self.meta_data['optimal_SNR']))
+        logger.info(
+            "  matched filter SNR = {:.2f}".format(self.meta_data['matched_filter_SNR'])
+        )
+        if print_para:
+            for key in parameters:
+                logger.info('  {} = {}'.format(key, parameters[key]))
 
 
 class SealTriangularInterferometer(InterferometerList):

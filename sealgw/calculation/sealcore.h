@@ -295,9 +295,9 @@ double calcExpterm(double j_r1, double j_r2,double j_i1, double j_i2,
 	return log_exp_term;
 }
 
-double et_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode){
+double lal_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode){
 	/*
-	Bilby has different geometry for ET in bilby and LAL. This function calculate ET's response functions in LAL.
+	Bilby has different geometry for ET&CE from LAL. This function calculate response functions in LAL.
 	*/
 	LALDetector tempdet;
 	double fplus,fcross,gmst;
@@ -318,6 +318,22 @@ double et_resp_func(double ra, double dec, double gpstime, double psi, int detco
 		return fcross;
 	}
 
+}
+
+double lal_dt_func(double ra, double dec, double gpstime, int detcode){
+	/*
+	Bilby has different geometry for ET&CE from LAL. This function calculate time delay from geocenter in LAL.
+	*/
+	LALDetector tempdet;
+	tempdet = lalCachedDetectors[detcode];
+
+	LIGOTimeGPS gps_time_ligo;
+	gps_time_ligo.gpsSeconds = (int)gpstime;
+	gps_time_ligo.gpsNanoSeconds = (int)(gpstime-(int)gpstime)*1000000000;
+
+	double dt;
+	dt = XLALTimeDelayFromEarthCenter(tempdet.location,ra,dec,&gps_time_ligo);
+	return dt;
 }
 
 double testfunc1(double ra, double dec, double gpstime, int detcode){

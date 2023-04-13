@@ -498,13 +498,15 @@ class SealBNSEW(Seal):
     The inferface of SealGW for binary neutrion stars early warning.
     '''
 
-    def __init__(self, config_dict=None, premerger_time=None, f_low=None):
+    def __init__(
+        self, config_dict=None, premerger_time_end=None, premerger_time_start=None
+    ):
         super(SealBNSEW, self).__init__(config_dict)
         if config_dict is None:
             self.initialized = False
             self.description = "An uninitialized seal."
-            self.premerger_time = premerger_time
-            self.f_low = f_low
+            self.premerger_time_end = premerger_time_end
+            self.premerger_time_start = premerger_time_start
 
         elif type(config_dict) == dict:
             self.prior_coef_a = config_dict['a']
@@ -512,8 +514,8 @@ class SealBNSEW(Seal):
             self.prior_coef_c = config_dict['c']
             self.prior_coef_d = config_dict['d']
             self.description = config_dict['description']
-            self.premerger_time = config_dict['premerger_time']
-            self.f_low = config_dict['f_low']
+            self.premerger_time_end = config_dict['premerger_time_end']
+            self.premerger_time_start = config_dict['premerger_time_start']
             self.initialized = True
 
         elif type(config_dict) == str:
@@ -525,16 +527,16 @@ class SealBNSEW(Seal):
             self.prior_coef_c = config_dict_from_file['c']
             self.prior_coef_d = config_dict_from_file['d']
             self.description = config_dict_from_file['description']
-            self.premerger_time = config_dict_from_file['premerger_time']
-            self.f_low = config_dict_from_file['f_low']
+            self.premerger_time_end = config_dict_from_file['premerger_time_end']
+            self.premerger_time_start = config_dict_from_file['premerger_time_start']
             self.initialized = True
         '''
         if config_dict:
             self.premerger_time = config_dict['premerger_time']
-            self.f_low = config_dict['f_low']
+            self.premerger_time_start = config_dict['premerger_time_start']
         elif self.initialized == False:
             self.premerger_time = premerger_time
-            self.f_low = f_low'''
+            self.premerger_time_start = premerger_time_start'''
 
     def _calculate_snr_kernel(
         self, sample_ID, samples, ifos, waveform_generator, source_type, results
@@ -543,8 +545,8 @@ class SealBNSEW(Seal):
             samples[sample_ID], source_type
         )  # or use zip_injection_parameters
         # inj_para = bilby.gw.conversion.generate_all_bns_parameters(inj_para)
-        inj_para['premerger_time'] = self.premerger_time
-        inj_para['flow'] = self.f_low
+        inj_para['premerger_time_end'] = self.premerger_time_end
+        inj_para['premerger_time_start'] = self.premerger_time_start
         h_dict = waveform_generator.frequency_domain_strain(parameters=inj_para)
 
         net_snr_sq = 0
@@ -564,8 +566,8 @@ class SealBNSEW(Seal):
             'b': self.prior_coef_b,
             'c': self.prior_coef_c,
             'd': self.prior_coef_d,
-            'premerger_time': self.premerger_time,
-            'f_low': self.f_low,
+            'premerger_time_end': self.premerger_time_end,
+            'premerger_time_start': self.premerger_time_start,
         }
 
         with open(filename, 'w') as file:

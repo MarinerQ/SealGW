@@ -7,10 +7,17 @@ def pytest1(double ra, double dec, double gpstime , int detcode):
 
 
 cdef extern from "sealcore.h":
-    double et_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode);
+    double lal_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode);
 
-def Pyet_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode):
-    return et_resp_func(ra, dec, gpstime, psi, detcode, mode )
+def Pylal_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode):
+    return lal_resp_func(ra, dec, gpstime, psi, detcode, mode )
+
+
+cdef extern from "sealcore.h":
+    double lal_dt_func(double ra, double dec, double gpstime, int detcode);
+
+def Pylal_dt_func(double ra, double dec, double gpstime, int detcode):
+    return lal_dt_func(ra, dec, gpstime, detcode )
 
 
 cdef extern from "sealcore.h":

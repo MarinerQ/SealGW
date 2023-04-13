@@ -274,6 +274,20 @@ def tau_of_f(f, m1=None, m2=None, mc=None):
     return tau
 
 
+def df_dtau(tau, m1=None, m2=None, mc=None):
+    '''
+    Return df/dtau
+    '''
+    if mc is None:
+        if m1 and m2:
+            mc = (m1 * m2) ** (3 / 5) / (m1 + m2) ** (1 / 5)
+        else:
+            raise ValueError("Mass not provided.")
+
+    derivative = (-3 / 8) * 134 * (tau) ** (-11 / 8) * (1.21 / mc) ** (5 / 8)
+    return derivative
+
+
 def segmentize_tau(tau, timescale):
     '''
     Chop tau into many segments based on timescale. Return a list containing the begining index of each segment.
@@ -305,17 +319,35 @@ def bns_truncated_fd_bilbypara(
     geocent_time,
     lambda_1,
     lambda_2,
-    premerger_time,
-    flow,
+    premerger_time_start,
+    premerger_time_end,
     **kwargs
 ):
     mass_1, mass_2 = chirp_mass_and_mass_ratio_to_component_masses(
         chirp_mass, mass_ratio
     )
-    fhigh = np.ceil(f_of_tau(premerger_time, m1=mass_1, m2=mass_2))
+
+    # flow = np.floor(f_of_tau(premerger_time_start, m1=mass_1, m2=mass_2))
+
+    # I want to pad t_pad[seconds] in time domain to deal with IFT contamination
+    # i.e. df = |df/dtau| * t_pad
+    t_pad = 4
+    f_pad = -t_pad * df_dtau(premerger_time_start, m1=mass_1, m2=mass_2)
+    flow = f_of_tau(premerger_time_start, m1=mass_1, m2=mass_2) - f_pad
+
+    if premerger_time_end == 0:
+        fhigh = farray[-1]
+    else:
+        f_pad = -t_pad * df_dtau(premerger_time_end, m1=mass_1, m2=mass_2)
+        # fhigh = np.ceil(f_of_tau(premerger_time_end, m1=mass_1, m2=mass_2))
+        fhigh = f_of_tau(premerger_time_end, m1=mass_1, m2=mass_2) + f_pad
     deltaf = farray[1] - farray[0]
     approx = 'TaylorF2'  # TaylorF2 IMRPhenomPv2 IMRPhenomPv2_NRTidalv2
     waveform_polarizations = {}
+
+    # The following two return values are pycbc frequency series
+    # with frequency stamp from 0 to fhigh.
+    # The data between 0 and flow are padded with zeros
     waveform_polarizations['plus'], waveform_polarizations['cross'] = get_fd_waveform(
         approximant=approx,
         mass1=mass_1,
@@ -337,15 +369,18 @@ def bns_truncated_fd_bilbypara(
         f_ref=50.0,
     )
 
+    # Since we already have freq stamp from 0 to fhigh, we just need to
+    # pad between fhigh and farray[-1], which is behind our current waveform
     N_gw = len(waveform_polarizations['plus'])
     N_wave_gen = len(farray)
-    zero_array = np.zeros(N_wave_gen - N_gw)
+    try:
+        zero_array = np.zeros(N_wave_gen - N_gw)
+    except:
+        print(N_wave_gen, N_gw)
     for mode in waveform_polarizations.keys():
         waveform_polarizations[mode] = np.append(
             waveform_polarizations[mode], zero_array
         )
-        # waveform_polarizations[mode] = waveform_polarizations[mode]
-
     return waveform_polarizations
 
 
@@ -684,7 +719,10 @@ def get_example_injpara(source_type):
 
 
 def get_ifos(det_name_list, duration, sampling_frequency, custom_psd_path):
-    ifos = bilby.gw.detector.InterferometerList(det_name_list)
+    # ifos = bilby.gw.detector.InterferometerList(det_name_list)
+    from .sealinterferometers import SealInterferometerList
+
+    ifos = SealInterferometerList(det_name_list)
 
     # set detector paramaters
     for i in range(len(ifos)):

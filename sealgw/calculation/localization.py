@@ -201,6 +201,7 @@ def seal_with_adaptive_healpix(
     max_snr_det_id,
     interp_order=0,
     use_timediff=True,
+    prior_type=0,
 ):
 
     # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
@@ -222,7 +223,7 @@ def seal_with_adaptive_healpix(
         use_timediff = 1
     else:
         use_timediff = 0
-    sealcore.Pycoherent_skymap_multires_bicorr(
+    sealcore.Pycoherent_skymap_multires(
         skymap_multires,
         time_arrays,
         snr_arrays,
@@ -240,158 +241,11 @@ def seal_with_adaptive_healpix(
         max_snr_det_id,
         nlevel,
         use_timediff,
+        prior_type,
     )
 
     # return normalize_log_probabilities(skymap_multires)
     return skymap_multires
-
-
-'''
-# Multi resolution in python, slower than pure C, especially when nlevel > 5.
-def seal_with_adaptive_healpix(
-    nlevel,
-    time_arrays,
-    snr_arrays,
-    det_code_array,
-    sigma_array,
-    ntimes_array,
-    ndet,
-    start_time,
-    end_time,
-    interp_factor,
-    prior_mu,
-    prior_sigma,
-    nthread,
-    max_snr_det_id,
-    interp_order=0,
-    use_timediff=True,
-):
-
-    # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
-    # Adaptive healpix: see Bayestar paper (and our seal paper).
-    nside_base = 16
-    npix_base = 12 * nside_base**2  # 12*16*16=3072
-
-    nside_final = nside_base * 2**nlevel  # 16 *  [1,4,16,...,2^6]
-    npix_final = 12 * nside_final**2  # 12582912 for nlevel=6
-
-    # ra, dec = generate_healpix_grids(nside_final)
-    skymap_multires = np.zeros(npix_final)
-
-    # let n_time be aligned with the finest sampled detector
-    # (as we allow different sampling rates)
-    # dts = []
-    # for detid in range(ndet):
-    #    dts.append(
-    #        time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
-    #    )
-    dts = [
-        time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
-        for detid in range(ndet)
-    ]
-    ntime_interp = int(interp_factor * (end_time - start_time) / min(dts))
-
-    # Initialize argsort
-    argsort = np.arange(npix_base / 4)
-    argsort_pix_id = np.arange(npix_base)
-    t0 = time.time()
-    for ilevel in range(nlevel + 1):
-        t1 = time.time()
-        iside = nside_base * 2**ilevel
-        # ipix = 12 * iside**2
-        #ra_for_this_level, dec_for_this_level = generate_healpix_grids(
-        #    iside
-        #)  # len(ra_for_this_level) == ipix
-
-        # Calculate the first 1/4 most probable grids from previous level
-        # len(ra_to_calculate) == npix_base
-        #ra_to_calculate = ra_for_this_level[argsort_pix_id]
-        #dec_to_calculate = dec_for_this_level[argsort_pix_id]
-
-        # Calculate skymap (of log prob density)
-        coh_skymap_for_this_level = np.zeros(npix_base)
-        t2 = time.time()
-        print(f'prepare time {t2-t1}')
-        if use_timediff:
-            sealcore.Pycoherent_skymap_bicorr_usetimediff(
-                coh_skymap_for_this_level,
-                time_arrays,
-                snr_arrays,
-                det_code_array,
-                sigma_array,
-                ntimes_array,
-                ndet,
-                #ra_to_calculate,
-                #dec_to_calculate,
-                argsort_pix_id.astype(ctypes.c_int32),
-                iside,
-                npix_base,
-                start_time,
-                end_time,
-                ntime_interp,
-                prior_mu,
-                prior_sigma,
-                nthread,
-                interp_order,
-                max_snr_det_id,
-            )
-        else:
-            sealcore.Pycoherent_skymap_bicorr(
-                coh_skymap_for_this_level,
-                time_arrays,
-                snr_arrays,
-                det_code_array,
-                sigma_array,
-                ntimes_array,
-                ndet,
-                ra_to_calculate,
-                dec_to_calculate,
-                npix_base,
-                start_time,
-                end_time,
-                ntime_interp,
-                prior_mu,
-                prior_sigma,
-                nthread,
-                interp_order,
-            )
-        t3 = time.time()
-        print(f'time cost of calculating skymap: {t3-t2}')
-        # Update skymap
-        nfactor = 4 ** (
-            nlevel - ilevel
-        )  # map a pixel of this level to multiple pixels in the final level
-
-        if ilevel == 0 or ilevel == 1:
-            for i in range(npix_base):
-                index = argsort_pix_id[i]
-                skymap_multires[
-                    index * nfactor : (index + 1) * nfactor
-                ] = coh_skymap_for_this_level[i]
-        else:
-            # This part faster (by 10x) than the for loop above when ilevel>=2,
-            # but slower (by 3x) when ilevel=0,1.
-            # Anyway, this if-else saves about 5-10ms...
-            index_array = argsort_pix_id.reshape(-1, 1) * nfactor + np.arange(nfactor)
-            skymap_multires[index_array.ravel()] = coh_skymap_for_this_level.repeat(
-                nfactor
-            )
-
-        # Update argsort
-        argsort = np.argsort(coh_skymap_for_this_level)[::-1][: int(npix_base / 4)]
-        argsort_temp = argsort_pix_id[argsort]
-
-        for j in range(4):
-            # map to next-level grids-to-calculate
-            argsort_pix_id[j::4] = argsort_temp * 4 + j
-        t4 = time.time()
-        print(f'time cost of updating skymap: {t4-t3}')
-    tn = time.time()
-    print(f'all loops time: {tn-t0}')
-    skymap_multires = normalize_log_probabilities(skymap_multires)
-    print(f'norm time: {time.time()-tn}')
-    return skymap_multires
-'''
 
 
 def get_det_code_array(det_name_list):

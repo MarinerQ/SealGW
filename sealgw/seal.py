@@ -26,6 +26,7 @@ from .simulation.generating_data import (
     zip_injection_parameters,
 )
 from .simulation.prior_fitting import find_horizon, fitting_abcd, para_conversion
+from .simulation.sealinterferometers import SealInterferometerList
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +234,7 @@ class Seal:
         interp_order=0,
         timecost=False,
         use_timediff=True,
+        prior_type=0,
     ):
         if not self.initialized:
             raise Exception("Seal not initialized!")
@@ -265,6 +267,7 @@ class Seal:
             max_snr_det_id,
             interp_order,
             use_timediff,
+            prior_type,
         )
         time2 = time.time()
 
@@ -285,6 +288,7 @@ class Seal:
         interp_order=0,
         timecost=False,
         use_timediff=True,
+        prior_type=0,
     ):
         if not self.initialized:
             raise Exception("Seal not initialized!")
@@ -325,6 +329,7 @@ class Seal:
             max_snr_det_id,
             interp_order,
             use_timediff,
+            prior_type,
         )
         time2 = time.time()
 
@@ -348,7 +353,7 @@ class Seal:
         source_type,
     ):
         injection_parameters = get_inj_paras(samples[sample_ID], source_type)
-        ifos = bilby.gw.detector.InterferometerList(det_name_list)
+        ifos = SealInterferometerList(det_name_list)
 
         # set detector paramaters
         for i in range(len(ifos)):
@@ -415,6 +420,7 @@ class Seal:
                 end_time,
                 nthread,
                 timecost=True,
+                use_timediff=False,
             )
 
             true_ra = injection_parameters['ra']
@@ -555,6 +561,107 @@ class SealBNSEW(Seal):
             net_snr_sq += det.optimal_snr_squared(signal)
 
         results[sample_ID] = np.sqrt(abs(net_snr_sq))
+
+    def _catalog_test_kernel(
+        self,
+        sample_ID,
+        samples,
+        det_name_list,
+        custom_psd_path,
+        waveform_generator,
+        results,
+        duration,
+        sampling_frequency,
+        Ncol,
+        nthread,
+        source_type,
+    ):
+        injection_parameters = get_inj_paras(samples[sample_ID], source_type)
+        injection_parameters['premerger_time_end'] = self.premerger_time_end
+        injection_parameters['premerger_time_start'] = self.premerger_time_start
+        ifos = SealInterferometerList(det_name_list)
+        det_name_list_full = ['ET1', 'ET2', 'ET3', 'CE']
+        # set detector paramaters
+        for i in range(len(ifos)):
+            det = ifos[i]
+            det.duration = duration
+            det.sampling_frequency = sampling_frequency
+            # psd_file = 'psd/{}/{}_psd.txt'.format(psd_label, det_name_list[i])
+            if custom_psd_path:  # otherwise auto-set by bilby
+                psd_file = custom_psd_path[i]
+                psd = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
+                det.power_spectral_density = psd
+
+        ifos.set_strain_data_from_power_spectral_densities(
+            sampling_frequency=sampling_frequency,
+            duration=duration,
+            start_time=injection_parameters['geocent_time'] - duration + 1,
+        )
+
+        ifos.inject_signal(
+            waveform_generator=waveform_generator, parameters=injection_parameters
+        )
+
+        snr_list, sigma_list = snr_generator(
+            ifos, waveform_generator, injection_parameters
+        )
+        max_snr_sq = 0
+        det_id = 0
+        for snr in snr_list:
+            peak = abs(snr).numpy().argmax()
+            snrp = snr[peak]
+            max_snr_sq += abs(snrp) ** 2
+            det_id += 1
+        max_snr = max_snr_sq**0.5
+
+        if max_snr < 8:
+            results[0 + Ncol * sample_ID] = max_snr
+            results[1 + Ncol * sample_ID] = -1
+            results[2 + Ncol * sample_ID] = -1
+            results[3 + Ncol * sample_ID] = -1
+            results[4 + Ncol * sample_ID] = -1
+            results[5 + Ncol * sample_ID] = -1
+        else:
+            sigma_array = np.array(sigma_list)
+
+            time_arrays = np.array([])
+            snr_arrays = np.array([])
+            ntimes_array = np.array([])
+            for snr in snr_list:
+                snr_arrays = np.append(snr_arrays, snr.data)
+                time_arrays = np.append(time_arrays, snr.sample_times.data)
+                ntimes_array = np.append(ntimes_array, len(snr.sample_times.data))
+
+            start_time = injection_parameters['geocent_time'] - 0.01
+            end_time = injection_parameters['geocent_time'] + 0.01
+
+            logprob_skymap, timecost = self.localize(
+                det_name_list_full,
+                time_arrays,
+                snr_arrays,
+                max_snr,
+                sigma_array,
+                ntimes_array,
+                start_time,
+                end_time,
+                nthread,
+                timecost=True,
+                use_timediff=False,
+                interp_factor=int(2048 * 8 / sampling_frequency),
+            )
+
+            true_ra = injection_parameters['ra']
+            true_dec = injection_parameters['dec']
+            confidence_areas, search_area, percentage = catalog_test_statistics(
+                logprob_skymap, true_ra, true_dec
+            )
+
+            results[0 + Ncol * sample_ID] = max_snr
+            results[1 + Ncol * sample_ID] = confidence_areas[0]
+            results[2 + Ncol * sample_ID] = confidence_areas[1]
+            results[3 + Ncol * sample_ID] = search_area
+            results[4 + Ncol * sample_ID] = percentage
+            results[5 + Ncol * sample_ID] = timecost
 
     def save_config_dict(self, filename):
         if not self.initialized:

@@ -12,6 +12,7 @@ from pycbc.filter import matched_filter
 from pycbc.types.frequencyseries import FrequencySeries
 from pycbc.types.timeseries import TimeSeries
 from pycbc.waveform import get_fd_waveform, get_td_waveform
+import logging
 
 # fmt: off
 _PARAMETERS = [
@@ -332,15 +333,15 @@ def bns_truncated_fd_bilbypara(
     # I want to pad t_pad[seconds] in time domain to deal with IFT contamination
     # i.e. df = |df/dtau| * t_pad
     t_pad = 4
-    f_pad = -t_pad * df_dtau(premerger_time_start, m1=mass_1, m2=mass_2)
-    flow = f_of_tau(premerger_time_start, m1=mass_1, m2=mass_2) - f_pad
+    f_pad = -t_pad * df_dtau(premerger_time_start, mc=chirp_mass)
+    flow = f_of_tau(premerger_time_start, mc=chirp_mass) - f_pad
 
     if premerger_time_end == 0:
         fhigh = farray[-1]
     else:
-        f_pad = -t_pad * df_dtau(premerger_time_end, m1=mass_1, m2=mass_2)
+        f_pad = -t_pad * df_dtau(premerger_time_end, mc=chirp_mass)
         # fhigh = np.ceil(f_of_tau(premerger_time_end, m1=mass_1, m2=mass_2))
-        fhigh = f_of_tau(premerger_time_end, m1=mass_1, m2=mass_2) + f_pad
+        fhigh = f_of_tau(premerger_time_end, mc=chirp_mass) + f_pad
     deltaf = farray[1] - farray[0]
     approx = 'TaylorF2'  # TaylorF2 IMRPhenomPv2 IMRPhenomPv2_NRTidalv2
     waveform_polarizations = {}
@@ -381,6 +382,91 @@ def bns_truncated_fd_bilbypara(
         waveform_polarizations[mode] = np.append(
             waveform_polarizations[mode], zero_array
         )
+        waveform_polarizations[mode] *= np.exp(-2 * np.pi * 1j * farray * 0.5)
+    return waveform_polarizations
+
+
+def bns_truncated_fd_bilbypara_earth_rotation(
+    farray,
+    chirp_mass,
+    mass_ratio,
+    a_1,
+    a_2,
+    luminosity_distance,
+    phase,
+    theta_jn,
+    ra,
+    dec,
+    psi,
+    geocent_time,
+    lambda_1,
+    lambda_2,
+    premerger_time_start,
+    premerger_time_end,
+    **kwargs
+):
+    mass_1, mass_2 = chirp_mass_and_mass_ratio_to_component_masses(
+        chirp_mass, mass_ratio
+    )
+
+    # flow = np.floor(f_of_tau(premerger_time_start, m1=mass_1, m2=mass_2))
+
+    # I want to pad t_pad[seconds] in time domain to deal with IFT contamination
+    # i.e. df = |df/dtau| * t_pad
+    t_pad = 4
+    f_pad = -t_pad * df_dtau(premerger_time_start, mc=chirp_mass)
+    flow = f_of_tau(premerger_time_start, mc=chirp_mass) - f_pad
+
+    if premerger_time_end == 0:
+        fhigh = farray[-1]
+    else:
+        f_pad = -t_pad * df_dtau(premerger_time_end, mc=chirp_mass)
+        # fhigh = np.ceil(f_of_tau(premerger_time_end, m1=mass_1, m2=mass_2))
+        fhigh = f_of_tau(premerger_time_end, mc=chirp_mass) + f_pad
+    deltaf = farray[1] - farray[0]
+    approx = 'TaylorF2'  # TaylorF2 IMRPhenomPv2 IMRPhenomPv2_NRTidalv2
+    waveform_polarizations = {}
+
+    # The following two return values are pycbc frequency series
+    # with frequency stamp from 0 to fhigh.
+    # The data between 0 and flow are padded with zeros
+    waveform_polarizations['plus'], waveform_polarizations['cross'] = get_fd_waveform(
+        approximant=approx,
+        mass1=mass_1,
+        mass2=mass_2,
+        distance=luminosity_distance,
+        inclination=theta_jn,
+        coa_phase=phase,
+        lambda1=lambda_1,
+        lambda2=lambda_2,
+        spin1x=0,
+        spin1y=0,
+        spin1z=a_1,
+        spin2x=0,
+        spin2y=0,
+        spin2z=a_2,
+        delta_f=deltaf,
+        f_lower=flow,
+        f_final=fhigh,
+        f_ref=50.0,
+    )
+
+    # Since we already have freq stamp from 0 to fhigh, we just need to
+    # pad between fhigh and farray[-1], which is behind our current waveform
+    N_gw = len(waveform_polarizations['plus'])
+    N_wave_gen = len(farray)
+    try:
+        zero_array = np.zeros(N_wave_gen - N_gw)
+    except:
+        print(N_wave_gen, N_gw)
+
+    dt = tau_of_f(farray, mc=chirp_mass)
+    dt[0] = dt[1]  # remove nan
+    for mode in waveform_polarizations.keys():
+        waveform_polarizations[mode] = np.append(
+            waveform_polarizations[mode], zero_array
+        )
+        # waveform_polarizations[mode] *= np.exp(-2 * np.pi * 1j * farray * dt)
     return waveform_polarizations
 
 
@@ -797,16 +883,16 @@ def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
         )
 
     elif source_type in ['BNS_EW_FD', 'BNS_EW_TD']:
-        dmax = 5000
+        dmax = 1000
         if 'dmax' in kwargs.keys():
             dmax = kwargs['dmax']
         samples = generate_random_inject_paras(
             Nsample=Nsample,
             dmin=0,
             dmax=dmax,
-            m1_low=1.1,
-            m1_high=2,
-            q_low=0.8,
+            m1_low=1.3,
+            m1_high=1.5,
+            q_low=0.95,
             a_max=0.1,
             m2_low=1.1,
             source_type=source_type,
@@ -818,7 +904,7 @@ def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
     return samples
 
 
-def snr_generator(ifos, waveform_generator, injection_parameter):
+def snr_generator(ifos, waveform_generator, injection_parameter, flow=None, fhigh=None):
     """
     Generate SNR timeseries and sigmas (waveform normalization factor).
 
@@ -834,7 +920,6 @@ def snr_generator(ifos, waveform_generator, injection_parameter):
     injection_parameters_copy = injection_parameter.copy()
     injection_parameters_copy["theta_jn"] = 0
     injection_parameters_copy["luminosity_distance"] = 1
-
     snr_list = []
     sigma_list = []
 
@@ -862,12 +947,22 @@ def snr_generator(ifos, waveform_generator, injection_parameter):
             det.power_spectral_density_array, delta_f=delta_f, epoch=epoch
         )
 
+        if flow is None:
+            low_frequency_cutoff = det.frequency_array[freq_mask][0]
+        else:
+            low_frequency_cutoff = flow
+
+        if fhigh is None:
+            high_frequency_cutoff = det.frequency_array[freq_mask][-1]
+        else:
+            high_frequency_cutoff = fhigh
+
         snr = matched_filter(
             hc_pycbc,
             d_pycbc,
             psd=psd_pycbc,
-            low_frequency_cutoff=det.frequency_array[freq_mask][0],
-            high_frequency_cutoff=det.frequency_array[freq_mask][-1],
+            low_frequency_cutoff=low_frequency_cutoff,
+            high_frequency_cutoff=high_frequency_cutoff,
         )
 
         hc_fd = waveform_generator.frequency_domain_strain(injection_parameters_copy)
@@ -880,3 +975,136 @@ def snr_generator(ifos, waveform_generator, injection_parameter):
         sigma_list.append(sigma)
 
     return snr_list, sigma_list
+
+
+def snr_generator_fd(
+    ifos, waveform_generator, injection_parameter, flow=None, fhigh=None
+):
+    """
+    Generate SNR timeseries and sigmas (waveform normalization factor).
+
+    Input:
+    ifos: bilby ifos
+    waveform_generator: bilby waveform_generator
+    injection_parameter: dict of injection parameters, as in bilby
+
+    return: two lists, as the sequence in input ifos
+    snr_timeseries_list: a list of snr timeseries (pycbc timeseries)
+    sigma_list: a list of sigmas
+    """
+    injection_parameters_copy = injection_parameter.copy()
+    injection_parameters_copy["theta_jn"] = 0
+    injection_parameters_copy["luminosity_distance"] = 1
+    snr_list = []
+    sigma_list = []
+
+    for det in ifos:
+        freq_mask = det.frequency_mask
+        delta_t = 1.0 / det.strain_data.sampling_frequency
+        delta_f = det.frequency_array[1] - det.frequency_array[0]
+        epoch = LIGOTimeGPS(det.strain_data.start_time)
+
+        d_pycbc = det.strain_data.to_pycbc_frequencyseries()
+        hc = waveform_generator.frequency_domain_strain(injection_parameters_copy)[
+            'plus'
+        ]
+        hc_pycbc = FrequencySeries(hc, delta_f=delta_f, epoch=epoch)
+        psd_pycbc = FrequencySeries(
+            det.power_spectral_density_array, delta_f=delta_f, epoch=epoch
+        )
+
+        if flow is None:
+            low_frequency_cutoff = det.frequency_array[freq_mask][0]
+        else:
+            low_frequency_cutoff = flow
+
+        if fhigh is None:
+            high_frequency_cutoff = det.frequency_array[freq_mask][-1]
+        else:
+            high_frequency_cutoff = fhigh
+
+        snr = matched_filter(
+            hc_pycbc,
+            d_pycbc,
+            psd=psd_pycbc,
+            low_frequency_cutoff=low_frequency_cutoff,
+            high_frequency_cutoff=high_frequency_cutoff,
+        )
+
+        sigma = bilby.gw.utils.noise_weighted_inner_product(
+            hc, hc, det.power_spectral_density_array, det.duration
+        )
+        sigma = np.sqrt(np.real(sigma))
+
+        snr_list.append(snr)
+        sigma_list.append(sigma)
+
+    return snr_list, sigma_list
+
+
+'''
+def matched_filter_fd(timestamp, det, data, hc, hs):
+    snr = np.zeros_like(timestamp) + np.zeros_like(timestamp) * 1j
+    for i, t in enumerate(timestamp):
+        mask = det.frequency_mask
+
+        phase_term = np.exp(2j * np.pi * det.frequency_array[mask] * t)
+
+        integrand_c = (
+            np.conj(data[mask])
+            * hc[mask]
+            * phase_term
+            / det.power_spectral_density_array[mask]
+        )
+        snr_real = np.real(4 / det.duration * np.sum(integrand_c))
+
+        integrand_s = (
+            np.conj(data[mask])
+            * hs[mask]
+            * phase_term
+            / det.power_spectral_density_array[mask]
+        )
+        snr_imag = np.real(4 / det.duration * np.sum(integrand_s))
+
+        snr[i] = snr_real + snr_imag * 1j
+
+    return snr
+
+
+def seal_snr_generator(ifos, waveform_generator, injection_parameter):
+    """
+    Generate SNR timeseries and sigmas (waveform normalization factor).
+
+    """
+    injection_parameters_copy = injection_parameter.copy()
+    injection_parameters_copy["theta_jn"] = 0
+    injection_parameters_copy["luminosity_distance"] = 1
+    snr_list = []
+    sigma_list = []
+
+    tc = injection_parameters_copy['geocent_time']
+    tindex = np.where(abs(ifos[0].time_array - tc) < 0.1)[0]
+    tarray = ifos[0].time_array[tindex]
+
+    for det in ifos:
+        freq_mask = det.frequency_mask
+        delta_t = 1.0 / det.strain_data.sampling_frequency
+
+        data = det.strain_data.frequency_domain_strain
+        hc = waveform_generator.frequency_domain_strain(injection_parameters_copy)[
+            'plus'
+        ]
+        hs = hc * np.exp(1j * np.pi / 2)
+
+        snr = matched_filter_fd(tarray, det, data, hc, hs)
+
+        sigma = bilby.gw.utils.noise_weighted_inner_product(
+            hc, hc, det.power_spectral_density_array, det.duration
+        )
+        sigma = np.sqrt(np.real(sigma))
+
+        snr_list.append(snr / sigma)
+        sigma_list.append(sigma)
+
+    return tarray, snr_list, sigma_list
+'''

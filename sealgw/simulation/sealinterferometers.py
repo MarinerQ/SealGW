@@ -70,7 +70,7 @@ class SealInterferometer(Interferometer):
         xarm_tilt=0.0,
         yarm_tilt=0.0,
         calibration_model=Recalibrate(),
-        antenna_response_change=False,
+        antenna_response_change=True,
         antenna_response_change_timescale=8.0,
     ):
         """
@@ -467,9 +467,22 @@ def get_empty_Sealinterferometer(name):
     interferometer: SealInterferometer
         SealInterferometer instance
     """
-    filename = os.path.join(
-        BILBY_ROOT_PATH, "gw", "detector", "detectors", "{}.interferometer".format(name)
-    )
+
+    if name in ['CEL']:
+        filename = os.path.join(
+            os.path.dirname(__file__),
+            "added_detectors",
+            "{}.interferometer".format(name),
+        )
+    else:
+        filename = os.path.join(
+            BILBY_ROOT_PATH,
+            "gw",
+            "detector",
+            "detectors",
+            "{}.interferometer".format(name),
+        )
+
     try:
         return load_Sealinterferometer(filename)
     except OSError:

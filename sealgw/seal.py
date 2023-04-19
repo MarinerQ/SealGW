@@ -216,7 +216,7 @@ class Seal:
         self.initialized = True
         logger.debug(f"Fitting done!\na = {a}\nb = {b}\nc = {c}\nd = {d}")
 
-        return simulation_result
+        return simulation_result, d_L
 
     def localize(
         self,

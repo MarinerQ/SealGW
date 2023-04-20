@@ -16,7 +16,7 @@ from matplotlib import pyplot as plt
 import time
 
 # export OMP_NUM_THREADS=8
-LAL_DET_MAP = dict(L1=6, H1=5, V1=2, K1=14, I1=15, CE=10, ET1=16, ET2=17, ET3=18)
+LAL_DET_MAP = dict(L1=6, H1=5, V1=2, K1=14, I1=15, CE=10, ET1=16, ET2=17, ET3=18, CEL=6)
 
 
 def cythontestfunc(ra, dec, gpstime, detcode):
@@ -202,6 +202,7 @@ def seal_with_adaptive_healpix(
     interp_order=0,
     use_timediff=True,
     prior_type=0,
+    premerger_time=0,
 ):
 
     # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
@@ -242,6 +243,7 @@ def seal_with_adaptive_healpix(
         nlevel,
         use_timediff,
         prior_type,
+        premerger_time,
     )
 
     # return normalize_log_probabilities(skymap_multires)

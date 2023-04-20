@@ -449,6 +449,7 @@ class Seal:
         sampling_frequency=4096,
         use_bilby_psd=True,
         custom_psd_path=None,
+        det_name_list_full=None,
     ):
         if self.initialized == False:
             raise Exception("Seal not initialized!")
@@ -544,6 +545,65 @@ class SealBNSEW(Seal):
             self.premerger_time = premerger_time
             self.premerger_time_start = premerger_time_start'''
 
+    def localize(
+        self,
+        det_name_list,
+        time_arrays,
+        snr_arrays,
+        max_snr,
+        sigmas,
+        ntimes,
+        start_time,
+        end_time,
+        nthread,
+        nlevel=5,
+        interp_factor=8,
+        interp_order=0,
+        timecost=False,
+        use_timediff=True,
+        prior_type=0,
+    ):
+        if not self.initialized:
+            raise Exception("Seal not initialized!")
+
+        det_code_array = get_det_code_array(det_name_list)
+        ndet = len(det_code_array)
+
+        prior_mu = self.prior_coef_a * max_snr + self.prior_coef_b
+        prior_sigma = self.prior_coef_c * max_snr + self.prior_coef_d
+
+        max_snr_index = np.argmax(abs(snr_arrays))
+        cumulative_ntimes = np.cumsum(ntimes)
+        max_snr_det_id = np.searchsorted(cumulative_ntimes, max_snr_index)
+
+        time1 = time.time()
+        prob_skymap = seal_with_adaptive_healpix(
+            nlevel,
+            time_arrays,
+            snr_arrays,
+            det_code_array.astype(ctypes.c_int32),
+            sigmas,
+            ntimes.astype(ctypes.c_int32),
+            ndet,
+            start_time,
+            end_time,
+            interp_factor,
+            prior_mu,
+            prior_sigma,
+            nthread,
+            max_snr_det_id,
+            interp_order,
+            use_timediff,
+            prior_type,
+            self.premerger_time_end,
+        )
+        time2 = time.time()
+
+        if timecost:
+            return prob_skymap, time2 - time1
+        else:
+            return prob_skymap
+
     def _calculate_snr_kernel(
         self, sample_ID, samples, ifos, waveform_generator, source_type, results
     ):
@@ -575,12 +635,12 @@ class SealBNSEW(Seal):
         Ncol,
         nthread,
         source_type,
+        det_name_list_full,
     ):
         injection_parameters = get_inj_paras(samples[sample_ID], source_type)
         injection_parameters['premerger_time_end'] = self.premerger_time_end
         injection_parameters['premerger_time_start'] = self.premerger_time_start
         ifos = SealInterferometerList(det_name_list)
-        det_name_list_full = ['ET1', 'ET2', 'ET3', 'CE']
         # set detector paramaters
         for i in range(len(ifos)):
             det = ifos[i]

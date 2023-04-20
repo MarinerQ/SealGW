@@ -2112,6 +2112,7 @@ static const char __pyx_k_pyx_getbuffer[] = "__pyx_getbuffer";
 static const char __pyx_k_reduce_cython[] = "__reduce_cython__";
 static const char __pyx_k_detector_codes[] = "detector_codes";
 static const char __pyx_k_max_snr_det_id[] = "max_snr_det_id";
+static const char __pyx_k_premerger_time[] = "premerger_time";
 static const char __pyx_k_Pylal_resp_func[] = "Pylal_resp_func";
 static const char __pyx_k_View_MemoryView[] = "View.MemoryView";
 static const char __pyx_k_allocate_buffer[] = "allocate_buffer";
@@ -2222,6 +2223,7 @@ static PyObject *__pyx_n_s_ntimes;
 static PyObject *__pyx_n_s_obj;
 static PyObject *__pyx_n_s_pack;
 static PyObject *__pyx_n_s_pickle;
+static PyObject *__pyx_n_s_premerger_time;
 static PyObject *__pyx_n_s_prior_mu;
 static PyObject *__pyx_n_s_prior_sigma;
 static PyObject *__pyx_n_s_prior_type;
@@ -2267,7 +2269,7 @@ static PyObject *__pyx_n_s_use_timediff;
 static PyObject *__pyx_pf_8sealcore_pytest1(CYTHON_UNUSED PyObject *__pyx_self, double __pyx_v_ra, double __pyx_v_dec, double __pyx_v_gpstime, int __pyx_v_detcode); /* proto */
 static PyObject *__pyx_pf_8sealcore_2Pylal_resp_func(CYTHON_UNUSED PyObject *__pyx_self, double __pyx_v_ra, double __pyx_v_dec, double __pyx_v_gpstime, double __pyx_v_psi, int __pyx_v_detcode, int __pyx_v_mode); /* proto */
 static PyObject *__pyx_pf_8sealcore_4Pylal_dt_func(CYTHON_UNUSED PyObject *__pyx_self, double __pyx_v_ra, double __pyx_v_dec, double __pyx_v_gpstime, int __pyx_v_detcode); /* proto */
-static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_coh_skymap_multires, __Pyx_memviewslice __pyx_v_time_arrays, __Pyx_memviewslice __pyx_v_snr_arrays, __Pyx_memviewslice __pyx_v_detector_codes, __Pyx_memviewslice __pyx_v_sigmas, __Pyx_memviewslice __pyx_v_ntimes, int __pyx_v_Ndet, double __pyx_v_start_time, double __pyx_v_end_time, int __pyx_v_ntime_interp, double __pyx_v_prior_mu, double __pyx_v_prior_sigma, int __pyx_v_nthread, int __pyx_v_interp_order, int __pyx_v_max_snr_det_id, int __pyx_v_nlevel, int __pyx_v_use_timediff, int __pyx_v_prior_type); /* proto */
+static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_coh_skymap_multires, __Pyx_memviewslice __pyx_v_time_arrays, __Pyx_memviewslice __pyx_v_snr_arrays, __Pyx_memviewslice __pyx_v_detector_codes, __Pyx_memviewslice __pyx_v_sigmas, __Pyx_memviewslice __pyx_v_ntimes, int __pyx_v_Ndet, double __pyx_v_start_time, double __pyx_v_end_time, int __pyx_v_ntime_interp, double __pyx_v_prior_mu, double __pyx_v_prior_sigma, int __pyx_v_nthread, int __pyx_v_interp_order, int __pyx_v_max_snr_det_id, int __pyx_v_nlevel, int __pyx_v_use_timediff, int __pyx_v_prior_type, double __pyx_v_premerger_time); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array___cinit__(struct __pyx_array_obj *__pyx_v_self, PyObject *__pyx_v_shape, Py_ssize_t __pyx_v_itemsize, PyObject *__pyx_v_format, PyObject *__pyx_v_mode, int __pyx_v_allocate_buffer); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array_2__getbuffer__(struct __pyx_array_obj *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_array___pyx_pf_15View_dot_MemoryView_5array_4__dealloc__(struct __pyx_array_obj *__pyx_v_self); /* proto */
@@ -2789,7 +2791,7 @@ static PyObject *__pyx_pf_8sealcore_4Pylal_dt_func(CYTHON_UNUSED PyObject *__pyx
   return __pyx_r;
 }
 
-/* "sealgw/calculation/cealcore.pyx":44
+/* "sealgw/calculation/cealcore.pyx":45
  *
  *
  * def Pycoherent_skymap_multires(             # <<<<<<<<<<<<<<
@@ -2819,6 +2821,7 @@ static PyObject *__pyx_pw_8sealcore_7Pycoherent_skymap_multires(PyObject *__pyx_
   int __pyx_v_nlevel;
   int __pyx_v_use_timediff;
   int __pyx_v_prior_type;
+  double __pyx_v_premerger_time;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -2826,12 +2829,14 @@ static PyObject *__pyx_pw_8sealcore_7Pycoherent_skymap_multires(PyObject *__pyx_
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("Pycoherent_skymap_multires (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_coh_skymap_multires,&__pyx_n_s_time_arrays,&__pyx_n_s_snr_arrays,&__pyx_n_s_detector_codes,&__pyx_n_s_sigmas,&__pyx_n_s_ntimes,&__pyx_n_s_Ndet,&__pyx_n_s_start_time,&__pyx_n_s_end_time,&__pyx_n_s_ntime_interp,&__pyx_n_s_prior_mu,&__pyx_n_s_prior_sigma,&__pyx_n_s_nthread,&__pyx_n_s_interp_order,&__pyx_n_s_max_snr_det_id,&__pyx_n_s_nlevel,&__pyx_n_s_use_timediff,&__pyx_n_s_prior_type,0};
-    PyObject* values[18] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_coh_skymap_multires,&__pyx_n_s_time_arrays,&__pyx_n_s_snr_arrays,&__pyx_n_s_detector_codes,&__pyx_n_s_sigmas,&__pyx_n_s_ntimes,&__pyx_n_s_Ndet,&__pyx_n_s_start_time,&__pyx_n_s_end_time,&__pyx_n_s_ntime_interp,&__pyx_n_s_prior_mu,&__pyx_n_s_prior_sigma,&__pyx_n_s_nthread,&__pyx_n_s_interp_order,&__pyx_n_s_max_snr_det_id,&__pyx_n_s_nlevel,&__pyx_n_s_use_timediff,&__pyx_n_s_prior_type,&__pyx_n_s_premerger_time,0};
+    PyObject* values[19] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case 19: values[18] = PyTuple_GET_ITEM(__pyx_args, 18);
+        CYTHON_FALLTHROUGH;
         case 18: values[17] = PyTuple_GET_ITEM(__pyx_args, 17);
         CYTHON_FALLTHROUGH;
         case 17: values[16] = PyTuple_GET_ITEM(__pyx_args, 16);
@@ -2880,109 +2885,115 @@ static PyObject *__pyx_pw_8sealcore_7Pycoherent_skymap_multires(PyObject *__pyx_
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_time_arrays)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 1); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 1); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_snr_arrays)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 2); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 2); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_detector_codes)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 3); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 3); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  4:
         if (likely((values[4] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_sigmas)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 4); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 4); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  5:
         if (likely((values[5] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_ntimes)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 5); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 5); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  6:
         if (likely((values[6] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_Ndet)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 6); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 6); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  7:
         if (likely((values[7] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_start_time)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 7); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 7); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  8:
         if (likely((values[8] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_end_time)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 8); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 8); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  9:
         if (likely((values[9] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_ntime_interp)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 9); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 9); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case 10:
         if (likely((values[10] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_prior_mu)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 10); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 10); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case 11:
         if (likely((values[11] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_prior_sigma)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 11); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 11); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case 12:
         if (likely((values[12] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_nthread)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 12); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 12); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case 13:
         if (likely((values[13] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_interp_order)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 13); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 13); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case 14:
         if (likely((values[14] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_max_snr_det_id)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 14); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 14); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case 15:
         if (likely((values[15] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_nlevel)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 15); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 15); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case 16:
         if (likely((values[16] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_use_timediff)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 16); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 16); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case 17:
         if (likely((values[17] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_prior_type)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, 17); __PYX_ERR(0, 44, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 17); __PYX_ERR(0, 45, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case 18:
+        if (likely((values[18] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_premerger_time)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, 18); __PYX_ERR(0, 45, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "Pycoherent_skymap_multires") < 0)) __PYX_ERR(0, 44, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "Pycoherent_skymap_multires") < 0)) __PYX_ERR(0, 45, __pyx_L3_error)
       }
-    } else if (PyTuple_GET_SIZE(__pyx_args) != 18) {
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 19) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
@@ -3003,42 +3014,44 @@ static PyObject *__pyx_pw_8sealcore_7Pycoherent_skymap_multires(PyObject *__pyx_
       values[15] = PyTuple_GET_ITEM(__pyx_args, 15);
       values[16] = PyTuple_GET_ITEM(__pyx_args, 16);
       values[17] = PyTuple_GET_ITEM(__pyx_args, 17);
+      values[18] = PyTuple_GET_ITEM(__pyx_args, 18);
     }
-    __pyx_v_coh_skymap_multires = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_coh_skymap_multires.memview)) __PYX_ERR(0, 45, __pyx_L3_error)
-    __pyx_v_time_arrays = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_time_arrays.memview)) __PYX_ERR(0, 46, __pyx_L3_error)
-    __pyx_v_snr_arrays = __Pyx_PyObject_to_MemoryviewSlice_ds___pyx_t_double_complex(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_snr_arrays.memview)) __PYX_ERR(0, 47, __pyx_L3_error)
-    __pyx_v_detector_codes = __Pyx_PyObject_to_MemoryviewSlice_ds_int(values[3], PyBUF_WRITABLE); if (unlikely(!__pyx_v_detector_codes.memview)) __PYX_ERR(0, 48, __pyx_L3_error)
-    __pyx_v_sigmas = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[4], PyBUF_WRITABLE); if (unlikely(!__pyx_v_sigmas.memview)) __PYX_ERR(0, 49, __pyx_L3_error)
-    __pyx_v_ntimes = __Pyx_PyObject_to_MemoryviewSlice_ds_int(values[5], PyBUF_WRITABLE); if (unlikely(!__pyx_v_ntimes.memview)) __PYX_ERR(0, 50, __pyx_L3_error)
-    __pyx_v_Ndet = __Pyx_PyInt_As_int(values[6]); if (unlikely((__pyx_v_Ndet == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 51, __pyx_L3_error)
-    __pyx_v_start_time = __pyx_PyFloat_AsDouble(values[7]); if (unlikely((__pyx_v_start_time == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 52, __pyx_L3_error)
-    __pyx_v_end_time = __pyx_PyFloat_AsDouble(values[8]); if (unlikely((__pyx_v_end_time == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 53, __pyx_L3_error)
-    __pyx_v_ntime_interp = __Pyx_PyInt_As_int(values[9]); if (unlikely((__pyx_v_ntime_interp == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 54, __pyx_L3_error)
-    __pyx_v_prior_mu = __pyx_PyFloat_AsDouble(values[10]); if (unlikely((__pyx_v_prior_mu == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 55, __pyx_L3_error)
-    __pyx_v_prior_sigma = __pyx_PyFloat_AsDouble(values[11]); if (unlikely((__pyx_v_prior_sigma == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 56, __pyx_L3_error)
-    __pyx_v_nthread = __Pyx_PyInt_As_int(values[12]); if (unlikely((__pyx_v_nthread == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 57, __pyx_L3_error)
-    __pyx_v_interp_order = __Pyx_PyInt_As_int(values[13]); if (unlikely((__pyx_v_interp_order == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 58, __pyx_L3_error)
-    __pyx_v_max_snr_det_id = __Pyx_PyInt_As_int(values[14]); if (unlikely((__pyx_v_max_snr_det_id == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 59, __pyx_L3_error)
-    __pyx_v_nlevel = __Pyx_PyInt_As_int(values[15]); if (unlikely((__pyx_v_nlevel == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 60, __pyx_L3_error)
-    __pyx_v_use_timediff = __Pyx_PyInt_As_int(values[16]); if (unlikely((__pyx_v_use_timediff == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
-    __pyx_v_prior_type = __Pyx_PyInt_As_int(values[17]); if (unlikely((__pyx_v_prior_type == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 62, __pyx_L3_error)
+    __pyx_v_coh_skymap_multires = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_coh_skymap_multires.memview)) __PYX_ERR(0, 46, __pyx_L3_error)
+    __pyx_v_time_arrays = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_time_arrays.memview)) __PYX_ERR(0, 47, __pyx_L3_error)
+    __pyx_v_snr_arrays = __Pyx_PyObject_to_MemoryviewSlice_ds___pyx_t_double_complex(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_snr_arrays.memview)) __PYX_ERR(0, 48, __pyx_L3_error)
+    __pyx_v_detector_codes = __Pyx_PyObject_to_MemoryviewSlice_ds_int(values[3], PyBUF_WRITABLE); if (unlikely(!__pyx_v_detector_codes.memview)) __PYX_ERR(0, 49, __pyx_L3_error)
+    __pyx_v_sigmas = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[4], PyBUF_WRITABLE); if (unlikely(!__pyx_v_sigmas.memview)) __PYX_ERR(0, 50, __pyx_L3_error)
+    __pyx_v_ntimes = __Pyx_PyObject_to_MemoryviewSlice_ds_int(values[5], PyBUF_WRITABLE); if (unlikely(!__pyx_v_ntimes.memview)) __PYX_ERR(0, 51, __pyx_L3_error)
+    __pyx_v_Ndet = __Pyx_PyInt_As_int(values[6]); if (unlikely((__pyx_v_Ndet == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 52, __pyx_L3_error)
+    __pyx_v_start_time = __pyx_PyFloat_AsDouble(values[7]); if (unlikely((__pyx_v_start_time == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 53, __pyx_L3_error)
+    __pyx_v_end_time = __pyx_PyFloat_AsDouble(values[8]); if (unlikely((__pyx_v_end_time == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 54, __pyx_L3_error)
+    __pyx_v_ntime_interp = __Pyx_PyInt_As_int(values[9]); if (unlikely((__pyx_v_ntime_interp == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 55, __pyx_L3_error)
+    __pyx_v_prior_mu = __pyx_PyFloat_AsDouble(values[10]); if (unlikely((__pyx_v_prior_mu == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 56, __pyx_L3_error)
+    __pyx_v_prior_sigma = __pyx_PyFloat_AsDouble(values[11]); if (unlikely((__pyx_v_prior_sigma == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 57, __pyx_L3_error)
+    __pyx_v_nthread = __Pyx_PyInt_As_int(values[12]); if (unlikely((__pyx_v_nthread == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 58, __pyx_L3_error)
+    __pyx_v_interp_order = __Pyx_PyInt_As_int(values[13]); if (unlikely((__pyx_v_interp_order == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 59, __pyx_L3_error)
+    __pyx_v_max_snr_det_id = __Pyx_PyInt_As_int(values[14]); if (unlikely((__pyx_v_max_snr_det_id == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 60, __pyx_L3_error)
+    __pyx_v_nlevel = __Pyx_PyInt_As_int(values[15]); if (unlikely((__pyx_v_nlevel == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
+    __pyx_v_use_timediff = __Pyx_PyInt_As_int(values[16]); if (unlikely((__pyx_v_use_timediff == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 62, __pyx_L3_error)
+    __pyx_v_prior_type = __Pyx_PyInt_As_int(values[17]); if (unlikely((__pyx_v_prior_type == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 63, __pyx_L3_error)
+    __pyx_v_premerger_time = __pyx_PyFloat_AsDouble(values[18]); if (unlikely((__pyx_v_premerger_time == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 64, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 18, 18, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 44, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("Pycoherent_skymap_multires", 1, 19, 19, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 45, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("sealcore.Pycoherent_skymap_multires", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_8sealcore_6Pycoherent_skymap_multires(__pyx_self, __pyx_v_coh_skymap_multires, __pyx_v_time_arrays, __pyx_v_snr_arrays, __pyx_v_detector_codes, __pyx_v_sigmas, __pyx_v_ntimes, __pyx_v_Ndet, __pyx_v_start_time, __pyx_v_end_time, __pyx_v_ntime_interp, __pyx_v_prior_mu, __pyx_v_prior_sigma, __pyx_v_nthread, __pyx_v_interp_order, __pyx_v_max_snr_det_id, __pyx_v_nlevel, __pyx_v_use_timediff, __pyx_v_prior_type);
+  __pyx_r = __pyx_pf_8sealcore_6Pycoherent_skymap_multires(__pyx_self, __pyx_v_coh_skymap_multires, __pyx_v_time_arrays, __pyx_v_snr_arrays, __pyx_v_detector_codes, __pyx_v_sigmas, __pyx_v_ntimes, __pyx_v_Ndet, __pyx_v_start_time, __pyx_v_end_time, __pyx_v_ntime_interp, __pyx_v_prior_mu, __pyx_v_prior_sigma, __pyx_v_nthread, __pyx_v_interp_order, __pyx_v_max_snr_det_id, __pyx_v_nlevel, __pyx_v_use_timediff, __pyx_v_prior_type, __pyx_v_premerger_time);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_coh_skymap_multires, __Pyx_memviewslice __pyx_v_time_arrays, __Pyx_memviewslice __pyx_v_snr_arrays, __Pyx_memviewslice __pyx_v_detector_codes, __Pyx_memviewslice __pyx_v_sigmas, __Pyx_memviewslice __pyx_v_ntimes, int __pyx_v_Ndet, double __pyx_v_start_time, double __pyx_v_end_time, int __pyx_v_ntime_interp, double __pyx_v_prior_mu, double __pyx_v_prior_sigma, int __pyx_v_nthread, int __pyx_v_interp_order, int __pyx_v_max_snr_det_id, int __pyx_v_nlevel, int __pyx_v_use_timediff, int __pyx_v_prior_type) {
+static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_coh_skymap_multires, __Pyx_memviewslice __pyx_v_time_arrays, __Pyx_memviewslice __pyx_v_snr_arrays, __Pyx_memviewslice __pyx_v_detector_codes, __Pyx_memviewslice __pyx_v_sigmas, __Pyx_memviewslice __pyx_v_ntimes, int __pyx_v_Ndet, double __pyx_v_start_time, double __pyx_v_end_time, int __pyx_v_ntime_interp, double __pyx_v_prior_mu, double __pyx_v_prior_sigma, int __pyx_v_nthread, int __pyx_v_interp_order, int __pyx_v_max_snr_det_id, int __pyx_v_nlevel, int __pyx_v_use_timediff, int __pyx_v_prior_type, double __pyx_v_premerger_time) {
   __Pyx_memviewslice __pyx_v_coh_skymap_multires_memview = { 0, 0, { 0 }, { 0 }, { 0 } };
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
@@ -3055,7 +3068,7 @@ static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED Py
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("Pycoherent_skymap_multires", 0);
 
-  /* "sealgw/calculation/cealcore.pyx":68
+  /* "sealgw/calculation/cealcore.pyx":70
  *     #    coh_skymap_bicorr = np.ascontiguousarray(coh_skymap_bicorr)
  *
  *     cdef double[:] coh_skymap_multires_memview = coh_skymap_multires             # <<<<<<<<<<<<<<
@@ -3065,7 +3078,7 @@ static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED Py
   __PYX_INC_MEMVIEW(&__pyx_v_coh_skymap_multires, 0);
   __pyx_v_coh_skymap_multires_memview = __pyx_v_coh_skymap_multires;
 
-  /* "sealgw/calculation/cealcore.pyx":71
+  /* "sealgw/calculation/cealcore.pyx":73
  *
  *     coherent_skymap_multires(
  * 			&coh_skymap_multires_memview[0],             # <<<<<<<<<<<<<<
@@ -3080,10 +3093,10 @@ static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED Py
   } else if (unlikely(__pyx_t_1 >= __pyx_v_coh_skymap_multires_memview.shape[0])) __pyx_t_2 = 0;
   if (unlikely(__pyx_t_2 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_2);
-    __PYX_ERR(0, 71, __pyx_L1_error)
+    __PYX_ERR(0, 73, __pyx_L1_error)
   }
 
-  /* "sealgw/calculation/cealcore.pyx":72
+  /* "sealgw/calculation/cealcore.pyx":74
  *     coherent_skymap_multires(
  * 			&coh_skymap_multires_memview[0],
  * 			&time_arrays[0],             # <<<<<<<<<<<<<<
@@ -3098,10 +3111,10 @@ static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED Py
   } else if (unlikely(__pyx_t_3 >= __pyx_v_time_arrays.shape[0])) __pyx_t_2 = 0;
   if (unlikely(__pyx_t_2 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_2);
-    __PYX_ERR(0, 72, __pyx_L1_error)
+    __PYX_ERR(0, 74, __pyx_L1_error)
   }
 
-  /* "sealgw/calculation/cealcore.pyx":73
+  /* "sealgw/calculation/cealcore.pyx":75
  * 			&coh_skymap_multires_memview[0],
  * 			&time_arrays[0],
  * 			&snr_arrays[0],             # <<<<<<<<<<<<<<
@@ -3116,10 +3129,10 @@ static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED Py
   } else if (unlikely(__pyx_t_4 >= __pyx_v_snr_arrays.shape[0])) __pyx_t_2 = 0;
   if (unlikely(__pyx_t_2 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_2);
-    __PYX_ERR(0, 73, __pyx_L1_error)
+    __PYX_ERR(0, 75, __pyx_L1_error)
   }
 
-  /* "sealgw/calculation/cealcore.pyx":74
+  /* "sealgw/calculation/cealcore.pyx":76
  * 			&time_arrays[0],
  * 			&snr_arrays[0],
  * 			&detector_codes[0],             # <<<<<<<<<<<<<<
@@ -3134,10 +3147,10 @@ static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED Py
   } else if (unlikely(__pyx_t_5 >= __pyx_v_detector_codes.shape[0])) __pyx_t_2 = 0;
   if (unlikely(__pyx_t_2 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_2);
-    __PYX_ERR(0, 74, __pyx_L1_error)
+    __PYX_ERR(0, 76, __pyx_L1_error)
   }
 
-  /* "sealgw/calculation/cealcore.pyx":75
+  /* "sealgw/calculation/cealcore.pyx":77
  * 			&snr_arrays[0],
  * 			&detector_codes[0],
  * 			&sigmas[0],             # <<<<<<<<<<<<<<
@@ -3152,10 +3165,10 @@ static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED Py
   } else if (unlikely(__pyx_t_6 >= __pyx_v_sigmas.shape[0])) __pyx_t_2 = 0;
   if (unlikely(__pyx_t_2 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_2);
-    __PYX_ERR(0, 75, __pyx_L1_error)
+    __PYX_ERR(0, 77, __pyx_L1_error)
   }
 
-  /* "sealgw/calculation/cealcore.pyx":76
+  /* "sealgw/calculation/cealcore.pyx":78
  * 			&detector_codes[0],
  * 			&sigmas[0],
  * 			&ntimes[0],             # <<<<<<<<<<<<<<
@@ -3170,31 +3183,31 @@ static PyObject *__pyx_pf_8sealcore_6Pycoherent_skymap_multires(CYTHON_UNUSED Py
   } else if (unlikely(__pyx_t_7 >= __pyx_v_ntimes.shape[0])) __pyx_t_2 = 0;
   if (unlikely(__pyx_t_2 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_2);
-    __PYX_ERR(0, 76, __pyx_L1_error)
+    __PYX_ERR(0, 78, __pyx_L1_error)
   }
 
-  /* "sealgw/calculation/cealcore.pyx":70
+  /* "sealgw/calculation/cealcore.pyx":72
  *     cdef double[:] coh_skymap_multires_memview = coh_skymap_multires
  *
  *     coherent_skymap_multires(             # <<<<<<<<<<<<<<
  * 			&coh_skymap_multires_memview[0],
  * 			&time_arrays[0],
  */
-  coherent_skymap_multires((&(*((double *) ( /* dim=0 */ (__pyx_v_coh_skymap_multires_memview.data + __pyx_t_1 * __pyx_v_coh_skymap_multires_memview.strides[0]) )))), (&(*((double *) ( /* dim=0 */ (__pyx_v_time_arrays.data + __pyx_t_3 * __pyx_v_time_arrays.strides[0]) )))), (&(*((__pyx_t_double_complex *) ( /* dim=0 */ (__pyx_v_snr_arrays.data + __pyx_t_4 * __pyx_v_snr_arrays.strides[0]) )))), (&(*((int *) ( /* dim=0 */ (__pyx_v_detector_codes.data + __pyx_t_5 * __pyx_v_detector_codes.strides[0]) )))), (&(*((double *) ( /* dim=0 */ (__pyx_v_sigmas.data + __pyx_t_6 * __pyx_v_sigmas.strides[0]) )))), (&(*((int *) ( /* dim=0 */ (__pyx_v_ntimes.data + __pyx_t_7 * __pyx_v_ntimes.strides[0]) )))), __pyx_v_Ndet, __pyx_v_start_time, __pyx_v_end_time, __pyx_v_ntime_interp, __pyx_v_prior_mu, __pyx_v_prior_sigma, __pyx_v_nthread, __pyx_v_interp_order, __pyx_v_max_snr_det_id, __pyx_v_nlevel, __pyx_v_use_timediff, __pyx_v_prior_type);
+  coherent_skymap_multires((&(*((double *) ( /* dim=0 */ (__pyx_v_coh_skymap_multires_memview.data + __pyx_t_1 * __pyx_v_coh_skymap_multires_memview.strides[0]) )))), (&(*((double *) ( /* dim=0 */ (__pyx_v_time_arrays.data + __pyx_t_3 * __pyx_v_time_arrays.strides[0]) )))), (&(*((__pyx_t_double_complex *) ( /* dim=0 */ (__pyx_v_snr_arrays.data + __pyx_t_4 * __pyx_v_snr_arrays.strides[0]) )))), (&(*((int *) ( /* dim=0 */ (__pyx_v_detector_codes.data + __pyx_t_5 * __pyx_v_detector_codes.strides[0]) )))), (&(*((double *) ( /* dim=0 */ (__pyx_v_sigmas.data + __pyx_t_6 * __pyx_v_sigmas.strides[0]) )))), (&(*((int *) ( /* dim=0 */ (__pyx_v_ntimes.data + __pyx_t_7 * __pyx_v_ntimes.strides[0]) )))), __pyx_v_Ndet, __pyx_v_start_time, __pyx_v_end_time, __pyx_v_ntime_interp, __pyx_v_prior_mu, __pyx_v_prior_sigma, __pyx_v_nthread, __pyx_v_interp_order, __pyx_v_max_snr_det_id, __pyx_v_nlevel, __pyx_v_use_timediff, __pyx_v_prior_type, __pyx_v_premerger_time);
 
-  /* "sealgw/calculation/cealcore.pyx":91
+  /* "sealgw/calculation/cealcore.pyx":94
  * 	)
  *
  *     return coh_skymap_multires             # <<<<<<<<<<<<<<
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_8 = __pyx_memoryview_fromslice(__pyx_v_coh_skymap_multires, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 91, __pyx_L1_error)
+  __pyx_t_8 = __pyx_memoryview_fromslice(__pyx_v_coh_skymap_multires, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 94, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
   __pyx_r = __pyx_t_8;
   __pyx_t_8 = 0;
   goto __pyx_L0;
 
-  /* "sealgw/calculation/cealcore.pyx":44
+  /* "sealgw/calculation/cealcore.pyx":45
  *
  *
  * def Pycoherent_skymap_multires(             # <<<<<<<<<<<<<<
@@ -17108,6 +17121,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_obj, __pyx_k_obj, sizeof(__pyx_k_obj), 0, 0, 1, 1},
   {&__pyx_n_s_pack, __pyx_k_pack, sizeof(__pyx_k_pack), 0, 0, 1, 1},
   {&__pyx_n_s_pickle, __pyx_k_pickle, sizeof(__pyx_k_pickle), 0, 0, 1, 1},
+  {&__pyx_n_s_premerger_time, __pyx_k_premerger_time, sizeof(__pyx_k_premerger_time), 0, 0, 1, 1},
   {&__pyx_n_s_prior_mu, __pyx_k_prior_mu, sizeof(__pyx_k_prior_mu), 0, 0, 1, 1},
   {&__pyx_n_s_prior_sigma, __pyx_k_prior_sigma, sizeof(__pyx_k_prior_sigma), 0, 0, 1, 1},
   {&__pyx_n_s_prior_type, __pyx_k_prior_type, sizeof(__pyx_k_prior_type), 0, 0, 1, 1},
@@ -17401,17 +17415,17 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__24);
   __pyx_codeobj__25 = (PyObject*)__Pyx_PyCode_New(4, 0, 4, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__24, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_sealgw_calculation_cealcore_pyx, __pyx_n_s_Pylal_dt_func, 19, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__25)) __PYX_ERR(0, 19, __pyx_L1_error)
 
-  /* "sealgw/calculation/cealcore.pyx":44
+  /* "sealgw/calculation/cealcore.pyx":45
  *
  *
  * def Pycoherent_skymap_multires(             # <<<<<<<<<<<<<<
  *                 double[:] coh_skymap_multires,
  *                 double[:] time_arrays,
  */
-  __pyx_tuple__26 = PyTuple_Pack(19, __pyx_n_s_coh_skymap_multires, __pyx_n_s_time_arrays, __pyx_n_s_snr_arrays, __pyx_n_s_detector_codes, __pyx_n_s_sigmas, __pyx_n_s_ntimes, __pyx_n_s_Ndet, __pyx_n_s_start_time, __pyx_n_s_end_time, __pyx_n_s_ntime_interp, __pyx_n_s_prior_mu, __pyx_n_s_prior_sigma, __pyx_n_s_nthread, __pyx_n_s_interp_order, __pyx_n_s_max_snr_det_id, __pyx_n_s_nlevel, __pyx_n_s_use_timediff, __pyx_n_s_prior_type, __pyx_n_s_coh_skymap_multires_memview); if (unlikely(!__pyx_tuple__26)) __PYX_ERR(0, 44, __pyx_L1_error)
+  __pyx_tuple__26 = PyTuple_Pack(20, __pyx_n_s_coh_skymap_multires, __pyx_n_s_time_arrays, __pyx_n_s_snr_arrays, __pyx_n_s_detector_codes, __pyx_n_s_sigmas, __pyx_n_s_ntimes, __pyx_n_s_Ndet, __pyx_n_s_start_time, __pyx_n_s_end_time, __pyx_n_s_ntime_interp, __pyx_n_s_prior_mu, __pyx_n_s_prior_sigma, __pyx_n_s_nthread, __pyx_n_s_interp_order, __pyx_n_s_max_snr_det_id, __pyx_n_s_nlevel, __pyx_n_s_use_timediff, __pyx_n_s_prior_type, __pyx_n_s_premerger_time, __pyx_n_s_coh_skymap_multires_memview); if (unlikely(!__pyx_tuple__26)) __PYX_ERR(0, 45, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__26);
   __Pyx_GIVEREF(__pyx_tuple__26);
-  __pyx_codeobj__27 = (PyObject*)__Pyx_PyCode_New(18, 0, 19, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__26, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_sealgw_calculation_cealcore_pyx, __pyx_n_s_Pycoherent_skymap_multires, 44, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__27)) __PYX_ERR(0, 44, __pyx_L1_error)
+  __pyx_codeobj__27 = (PyObject*)__Pyx_PyCode_New(19, 0, 20, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__26, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_sealgw_calculation_cealcore_pyx, __pyx_n_s_Pycoherent_skymap_multires, 45, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__27)) __PYX_ERR(0, 45, __pyx_L1_error)
 
   /* "View.MemoryView":287
  *         return self.name
@@ -17860,16 +17874,16 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_Pylal_dt_func, __pyx_t_1) < 0) __PYX_ERR(0, 19, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "sealgw/calculation/cealcore.pyx":44
+  /* "sealgw/calculation/cealcore.pyx":45
  *
  *
  * def Pycoherent_skymap_multires(             # <<<<<<<<<<<<<<
  *                 double[:] coh_skymap_multires,
  *                 double[:] time_arrays,
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_8sealcore_7Pycoherent_skymap_multires, NULL, __pyx_n_s_sealcore); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 44, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_8sealcore_7Pycoherent_skymap_multires, NULL, __pyx_n_s_sealcore); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 45, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_Pycoherent_skymap_multires, __pyx_t_1) < 0) __PYX_ERR(0, 44, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_Pycoherent_skymap_multires, __pyx_t_1) < 0) __PYX_ERR(0, 45, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "sealgw/calculation/cealcore.pyx":2

@@ -382,7 +382,7 @@ def bns_truncated_fd_bilbypara(
         waveform_polarizations[mode] = np.append(
             waveform_polarizations[mode], zero_array
         )
-        waveform_polarizations[mode] *= np.exp(-2 * np.pi * 1j * farray * 0.5)
+        waveform_polarizations[mode] *= np.exp(2 * np.pi * 1j * farray * -0.2)
     return waveform_polarizations
 
 

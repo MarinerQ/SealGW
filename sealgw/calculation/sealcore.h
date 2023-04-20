@@ -16,6 +16,7 @@
 #include <lal/LALDatatypes.h>
 #include <lal/Date.h>
 #include <lal/Units.h>
+#include <lal/DetResponse.h>
 
 #include <chealpix.h>
 
@@ -210,9 +211,10 @@ static void getGpc(const LALDetector detector, double ra, double de, double gps_
 	double fplus,fcross,gmst;
 	LIGOTimeGPS gps_time_ligo;
 	gps_time_ligo.gpsSeconds = (int)gps_time;
-	gps_time_ligo.gpsNanoSeconds = (int)(gps_time-(int)gps_time)*1000000000;//a probable mistake here
+	gps_time_ligo.gpsNanoSeconds = (int)(gps_time-(int)gps_time)*1000000000;
 	gmst = XLALGreenwichMeanSiderealTime(&gps_time_ligo);
-	ComputeDetAMResponse(&fplus,&fcross,detector.response,ra,de,0.0,gmst);//psi = 0
+	//ComputeDetAMResponse(&fplus,&fcross,detector.response,ra,de,0.0,gmst);//psi = 0
+	XLALComputeDetAMResponse(&fplus,&fcross,detector.response,ra,de,0.0,gmst);
 
 	if(Gpc==NULL){
 		printf("Gpc is a NULL pointer\n");
@@ -335,7 +337,8 @@ double lal_resp_func(double ra, double dec, double gpstime, double psi, int detc
 	gmst = XLALGreenwichMeanSiderealTime(&gps_time_ligo);
 
 	tempdet = lalCachedDetectors[detcode];
-	ComputeDetAMResponse(&fplus,&fcross,tempdet.response,ra,dec,psi,gmst);
+	//ComputeDetAMResponse(&fplus,&fcross,tempdet.response,ra,dec,psi,gmst);
+	XLALComputeDetAMResponse(&fplus,&fcross,tempdet.response,ra,dec,psi,gmst);
 
 	if(mode==0)
 	{
@@ -449,12 +452,13 @@ void _coherent_skymap_bicorr(
 				const int nthread,
 				const int interp_order,
 				const int max_snr_det_id,
-				const int use_timediff)
+				const int use_timediff,
+				const double premerger_time)
 {
 	int grid_id,time_id,det_id;
 
 	double dt = (end_time-start_time)/ntime_interp;
-	double ref_gps_time = (start_time + end_time)/2.0;
+	double ref_gps_time = (start_time + end_time)/2.0 - premerger_time;
 
 	LIGOTimeGPS ligo_gps_time;
 	ligo_gps_time.gpsSeconds = (int)(ref_gps_time);
@@ -579,12 +583,13 @@ void _coherent_skymap_bi(
 				const int nthread,
 				const int interp_order,
 				const int max_snr_det_id,
-				const int use_timediff)
+				const int use_timediff,
+				const double premerger_time)
 {
 	int grid_id,time_id,det_id;
 
 	double dt = (end_time-start_time)/ntime_interp;
-	double ref_gps_time = (start_time + end_time)/2.0;
+	double ref_gps_time = (start_time + end_time)/2.0 - premerger_time;
 
 	LIGOTimeGPS ligo_gps_time;
 	ligo_gps_time.gpsSeconds = (int)(ref_gps_time);
@@ -782,7 +787,8 @@ void coherent_skymap_multires(
 	const int max_snr_det_id,
 	const int nlevel,
 	const int use_timediff,
-	const int prior_type)
+	const int prior_type,
+	const double premerger_time)
 {
 	int i,j,i_level;
 	int nside_base = 16;
@@ -839,7 +845,8 @@ void coherent_skymap_multires(
 				nthread,
 				interp_order,
 				max_snr_det_id,
-				use_timediff);
+				use_timediff,
+				premerger_time);
 			break;
 
 		case 1:
@@ -862,7 +869,8 @@ void coherent_skymap_multires(
 				nthread,
 				interp_order,
 				max_snr_det_id,
-				use_timediff);
+				use_timediff,
+				premerger_time);
 			break;
 
 		default:

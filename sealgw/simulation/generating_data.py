@@ -296,13 +296,16 @@ def segmentize_tau(tau, timescale):
     tau should in descend order
     '''
     segment_starts = []
-    current_start = 0
-    for i in range(1, len(tau)):
-        if tau[current_start] - tau[i] > timescale:
+    current_start = len(tau) - 1
+    inverse_index = np.arange(len(tau) - 1)[
+        ::-1
+    ]  # last one excluded, as it is current_start
+    for i in inverse_index:
+        if abs(tau[current_start] - tau[i]) > timescale:
             segment_starts.append(current_start)
             current_start = i
     segment_starts.append(current_start)
-    return segment_starts
+    return segment_starts[::-1]
 
 
 def bns_truncated_fd_bilbypara(

@@ -155,7 +155,10 @@ double complex interpolate_time_series(COMPLEX16TimeSeries *lal_array, double ti
 }
 
 
-
+/*
+Copied from https://lscsoft.docs.ligo.org/lalsuite/lal/_det_response_8c_source.html#l00044
+for test use.
+*/
 static void ComputeDetAMResponse(
 		double *fplus,          /**< Returned value of F+ */
 		double *fcross,         /**< Returned value of Fx */

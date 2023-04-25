@@ -161,10 +161,7 @@ class SealInterferometer(Interferometer):
         if mode in ["plus", "cross", "x", "y", "breathing", "longitudinal"]:
             if self.name in ['ET1', 'ET2', 'ET3', 'CE', 'CEL']:
                 return lal_response_function(ra, dec, time, psi, self.name, mode)
-            # elif self.name == 'CE':
-            #    return lal_ce_response_function(ra, dec, time, psi, mode)
             else:
-                print('!!!!!!')
                 polarization_tensor = get_polarization_tensor(ra, dec, time, psi, mode)
                 return three_by_three_matrix_contraction(
                     self.geometry.detector_tensor, polarization_tensor
@@ -196,7 +193,7 @@ class SealInterferometer(Interferometer):
         if self.name in ['ET1', 'ET2', 'ET3', 'CE', 'CEL']:
             return lal_dt_function(ra, dec, time, self.name)
         else:
-            print('!!!!!!')
+            # print('!!!!!!')
             return time_delay_from_geocenter(self.geometry.vertex, ra, dec, time)
 
     def get_detector_response(

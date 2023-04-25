@@ -486,6 +486,7 @@ class Seal:
             Ncol=Ncol,
             nthread=nthread,
             source_type=source_type,
+            det_name_list_full=det_name_list_full,
         )
 
         print("Localizing for them...")

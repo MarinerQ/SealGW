@@ -4,11 +4,11 @@ from setuptools import Extension, setup
 
 sealcore = Extension(
     name="sealcore",
-    sources=['sealgw/calculation/cealcore.pyx'],
+    sources=['sealgw/calculation/cealcore.pyx', 'cextern/chealpix/chealpix.c'],
     libraries=['m', 'gsl', 'gslcblas', 'lal'],
     language='c',
-    extra_compile_args=['-fopenmp', '-O3'],
-    extra_link_args=['-fopenmp', '-O3'],
+    extra_compile_args=['-fopenmp', '-O3', '-lchealpix'],
+    extra_link_args=['-fopenmp', '-O3', '-lchealpix'],
 )
 
 install_requires = [
@@ -33,7 +33,7 @@ setup(
     python_requires='>=3',
     packages=["sealgw", 'sealgw.calculation', 'sealgw.simulation'],
     install_requires=install_requires,
-    include_dirs=[numpy.get_include()],
+    include_dirs=[numpy.get_include(), 'cextern/chealpix'],
     setup_requires=['numpy', 'cython', 'setuptools_scm'],
     entry_points={},
     ext_modules=cythonize([sealcore]),

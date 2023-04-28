@@ -351,6 +351,8 @@ class Seal:
         Ncol,
         nthread,
         source_type,
+        prior_type,
+        fmin,
     ):
         injection_parameters = get_inj_paras(samples[sample_ID], source_type)
         ifos = SealInterferometerList(det_name_list)
@@ -365,6 +367,7 @@ class Seal:
                 psd_file = custom_psd_path[i]
                 psd = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
                 det.power_spectral_density = psd
+            det.frequency_mask = det.frequency_array >= fmin
 
         ifos.set_strain_data_from_power_spectral_densities(
             sampling_frequency=sampling_frequency,
@@ -421,6 +424,7 @@ class Seal:
                 nthread,
                 timecost=True,
                 use_timediff=False,
+                prior_type=prior_type,
             )
 
             true_ra = injection_parameters['ra']
@@ -450,6 +454,7 @@ class Seal:
         use_bilby_psd=True,
         custom_psd_path=None,
         det_name_list_full=None,
+        prior_type=0,
     ):
         if self.initialized == False:
             raise Exception("Seal not initialized!")
@@ -487,6 +492,8 @@ class Seal:
             nthread=nthread,
             source_type=source_type,
             det_name_list_full=det_name_list_full,
+            prior_type=prior_type,
+            fmin=fmin,
         )
 
         print("Localizing for them...")
@@ -637,6 +644,8 @@ class SealBNSEW(Seal):
         nthread,
         source_type,
         det_name_list_full,
+        prior_type,
+        fmin,
     ):
         injection_parameters = get_inj_paras(samples[sample_ID], source_type)
         injection_parameters['premerger_time_end'] = self.premerger_time_end
@@ -652,6 +661,8 @@ class SealBNSEW(Seal):
                 psd_file = custom_psd_path[i]
                 psd = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
                 det.power_spectral_density = psd
+                det.antenna_response_change = True
+            det.frequency_mask = det.frequency_array >= fmin
 
         ifos.set_strain_data_from_power_spectral_densities(
             sampling_frequency=sampling_frequency,
@@ -709,6 +720,7 @@ class SealBNSEW(Seal):
                 timecost=True,
                 use_timediff=False,
                 interp_factor=int(2048 * 8 / sampling_frequency),
+                prior_type=prior_type,
             )
 
             true_ra = injection_parameters['ra']

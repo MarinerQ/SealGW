@@ -349,7 +349,6 @@ class SealInterferometer(Interferometer):
                     self.strain_data.start_time, parameters['geocent_time']
                 )
             )
-
         signal_ifo = self.get_detector_response(injection_polarizations, parameters)
         self.strain_data.frequency_domain_strain += signal_ifo
 

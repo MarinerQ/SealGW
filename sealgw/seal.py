@@ -149,8 +149,8 @@ class Seal:
             horizon = find_horizon(
                 ifos, waveform_generator, example_injection_parameter
             )
-            if source_type in ['BNS', 'NSBH']:
-                horizon = horizon * 0.6  # get more high SNR samples for fitting
+            # if source_type in ['BNS', 'NSBH']:
+            horizon = horizon / 3  # get more high SNR samples for fitting
             logger.warning(
                 f"Warning: Max luminosity distance is not provided. Using {horizon}Mpc."
             )

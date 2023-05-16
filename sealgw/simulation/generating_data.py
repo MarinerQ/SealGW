@@ -71,6 +71,24 @@ def generate_random_mass(Nsample, m1_low, m1_high, q_low, m2_low):
     return m1, m2
 
 
+def generate_random_mass_fixMc(Nsample, source_type):
+    if source_type in ['BBH']:
+        mc = np.zeros(Nsample) + 30
+        q_low = 0.6
+        q_high = 1
+    elif source_type in ['BNS', 'BNS_EW_FD', 'BNS_EW_TD']:
+        mc = np.zeros(Nsample) + 1.22  # 1.4+1.4
+        q_low = 0.9
+        q_high = 1
+    elif source_type in ['NSBH']:
+        mc = np.zeros(Nsample) + 4  # 20+1.4
+        q_low = 1.1 / (21.4 - 1.1)
+        q_high = 2 / (11.4 - 2)
+
+    q = np.random.uniform(low=q_low, high=q_high, size=Nsample)
+    return mc, q
+
+
 def generate_random_angle(Nsample, flag, low=0, high=2 * np.pi):
     """
     flag='cos' works for iota, whose cosine is uniform in [-1,1]
@@ -123,6 +141,74 @@ def generate_random_inject_paras(
     )
     chirp_mass = component_masses_to_chirp_mass(mass_1, mass_2)
     mass_ratio = mass_2 / mass_1
+
+    # spin + theta_jn: 7 parameters
+    assert spin_type == "aligned", "Only aligned spins supported for this algorithm."
+    a_1 = np.random.uniform(low=0, high=a_max, size=Nsample)
+    a_2 = np.random.uniform(low=0, high=a_max, size=Nsample)
+    phi_jl = np.zeros(Nsample)
+    tilt_1 = np.zeros(Nsample)
+    tilt_2 = np.zeros(Nsample)
+    phi_12 = np.zeros(Nsample)
+    iota = generate_random_angle(Nsample, "cos")
+
+    # extrinsics: 6 parameters
+    psi = generate_random_angle(Nsample, "flat", low=0, high=np.pi)
+    phase = generate_random_angle(Nsample, "flat", low=0, high=2 * np.pi)
+    ra = generate_random_angle(Nsample, "flat", low=0, high=2 * np.pi)
+    dec = generate_random_angle(Nsample, "sin")
+    luminosity_distance = generate_random_distance(Nsample, low=dmin, high=dmax)
+    geocent_time = np.random.uniform(low=0, high=3.14e7, size=Nsample)
+
+    parameter_arrays = [
+        chirp_mass, mass_ratio, a_1, a_2, tilt_1, tilt_2, phi_12, phi_jl, iota,
+        psi, phase, ra, dec, luminosity_distance, geocent_time,
+    ]  # fmt: skip
+
+    # additional parameters for non-BBH source types
+    if source_type == 'BNS':
+        lambda_1 = np.random.uniform(low=400, high=450, size=Nsample)
+        lambda_2 = np.random.uniform(low=400, high=450, size=Nsample)
+        parameter_arrays += [lambda_1, lambda_2]
+
+    elif source_type == 'NSBH':
+        lambda_1 = np.zeros(Nsample)
+        lambda_2 = np.random.uniform(low=400, high=450, size=Nsample)
+        parameter_arrays += [lambda_1, lambda_2]
+
+    elif source_type in ['BNS_EW_FD', 'BNS_EW_TD']:
+        lambda_1 = np.random.uniform(low=400, high=450, size=Nsample)
+        lambda_2 = np.random.uniform(low=400, high=450, size=Nsample)
+        # premerger_time = np.zeros(Nsample) + pre_t
+        # flows = np.zeros(Nsample) + flow
+        parameter_arrays += [lambda_1, lambda_2]
+
+        # para_list = [chirp_mass,mass_ratio,a_1,a_2,tilt_1,tilt_2,phi_12,phi_jl,
+        #        iota, psi, phase, ra, dec, luminosity_distance, geocent_time,
+        #        lambda_1, lambda_2, premerger_time, flows]
+
+    else:
+        # raise Exception('Source type error!')
+        pass
+
+    return np.stack(parameter_arrays, axis=1)
+
+
+def generate_random_inject_paras_fixMc(
+    Nsample,
+    dmin,
+    dmax,
+    a_max,
+    source_type,
+    spin_type='aligned',
+    pre_t=None,
+    flow=None,
+):
+
+    # mass: 2 parameters
+    chirp_mass, mass_ratio = generate_random_mass_fixMc(Nsample, source_type)
+    # chirp_mass = component_masses_to_chirp_mass(mass_1, mass_2)
+    # mass_ratio = mass_2 / mass_1
 
     # spin + theta_jn: 7 parameters
     assert spin_type == "aligned", "Only aligned spins supported for this algorithm."
@@ -746,65 +832,23 @@ def get_example_injpara(source_type):
     example_injection_parameter = dict()
 
     if source_type == 'BNS':
-        mc = bilby.gw.conversion.component_masses_to_chirp_mass(1.2, 1.2)
+        mc = bilby.gw.conversion.component_masses_to_chirp_mass(1.4, 1.4)
         example_injection_parameter['chirp_mass'] = mc
         example_injection_parameter['mass_ratio'] = 1
-        example_injection_parameter['a_1'] = 0
-        example_injection_parameter['a_2'] = 0
-        example_injection_parameter['tilt_1'] = 0
-        example_injection_parameter['tilt_2'] = 0
-        example_injection_parameter['phi_12'] = 0
-        example_injection_parameter['phi_jl'] = 0
         example_injection_parameter['lambda_1'] = 425
         example_injection_parameter['lambda_2'] = 425
 
-        example_injection_parameter['theta_jn'] = 0
-        example_injection_parameter['psi'] = 0
-        example_injection_parameter['phase'] = 0
-        example_injection_parameter['ra'] = 0
-        example_injection_parameter['dec'] = 0
-        example_injection_parameter['luminosity_distance'] = 1
-        example_injection_parameter['geocent_time'] = 0
-
     elif source_type == 'BBH':
-        mc = bilby.gw.conversion.component_masses_to_chirp_mass(10, 10)
-        example_injection_parameter['chirp_mass'] = mc
+        # mc = bilby.gw.conversion.component_masses_to_chirp_mass(10, 10)
+        example_injection_parameter['chirp_mass'] = 30
         example_injection_parameter['mass_ratio'] = 1
-        example_injection_parameter['a_1'] = 0
-        example_injection_parameter['a_2'] = 0
-        example_injection_parameter['tilt_1'] = 0
-        example_injection_parameter['tilt_2'] = 0
-        example_injection_parameter['phi_12'] = 0
-        example_injection_parameter['phi_jl'] = 0
-
-        example_injection_parameter['theta_jn'] = 0
-        example_injection_parameter['psi'] = 0
-        example_injection_parameter['phase'] = 0
-        example_injection_parameter['ra'] = 0
-        example_injection_parameter['dec'] = 0
-        example_injection_parameter['luminosity_distance'] = 1
-        example_injection_parameter['geocent_time'] = 0
 
     elif source_type == 'NSBH':
         mc = bilby.gw.conversion.component_masses_to_chirp_mass(10, 1.4)
         example_injection_parameter['chirp_mass'] = mc
         example_injection_parameter['mass_ratio'] = 1.4 / 10
-        example_injection_parameter['a_1'] = 0
-        example_injection_parameter['a_2'] = 0
-        example_injection_parameter['tilt_1'] = 0
-        example_injection_parameter['tilt_2'] = 0
-        example_injection_parameter['phi_12'] = 0
-        example_injection_parameter['phi_jl'] = 0
         example_injection_parameter['lambda_1'] = 0
         example_injection_parameter['lambda_2'] = 425
-
-        example_injection_parameter['theta_jn'] = 0
-        example_injection_parameter['psi'] = 0
-        example_injection_parameter['phase'] = 0
-        example_injection_parameter['ra'] = 0
-        example_injection_parameter['dec'] = 0
-        example_injection_parameter['luminosity_distance'] = 1
-        example_injection_parameter['geocent_time'] = 0
 
     elif source_type == 'BNS_EW_FD':
         raise Exception('This function is under development!')
@@ -814,6 +858,20 @@ def get_example_injpara(source_type):
 
     else:
         raise Exception('Source type error!')
+
+    example_injection_parameter['a_1'] = 0
+    example_injection_parameter['a_2'] = 0
+    example_injection_parameter['tilt_1'] = 0
+    example_injection_parameter['tilt_2'] = 0
+    example_injection_parameter['phi_12'] = 0
+    example_injection_parameter['phi_jl'] = 0
+    example_injection_parameter['theta_jn'] = 0
+    example_injection_parameter['psi'] = 0
+    example_injection_parameter['phase'] = 0
+    example_injection_parameter['ra'] = 0
+    example_injection_parameter['dec'] = 0
+    example_injection_parameter['luminosity_distance'] = 1
+    example_injection_parameter['geocent_time'] = 0
 
     return example_injection_parameter
 
@@ -852,9 +910,14 @@ def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
         dmax = 200
         if 'dmax' in kwargs.keys():
             dmax = kwargs['dmax']
+
+        samples = generate_random_inject_paras_fixMc(
+            Nsample=Nsample, dmin=10, dmax=dmax, a_max=0.1, source_type=source_type
+        )
+        '''
         samples = generate_random_inject_paras(
             Nsample=Nsample,
-            dmin=0,
+            dmin=10,
             dmax=dmax,
             m1_low=1.1,
             m1_high=2,
@@ -863,14 +926,20 @@ def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
             m2_low=1.1,
             source_type=source_type,
         )
+        '''
 
     elif source_type == 'BBH':
         dmax = 4000
         if 'dmax' in kwargs.keys():
             dmax = kwargs['dmax']
+
+        samples = generate_random_inject_paras_fixMc(
+            Nsample=Nsample, dmin=10, dmax=dmax, a_max=0.1, source_type=source_type
+        )
+        '''
         samples = generate_random_inject_paras(
             Nsample=Nsample,
-            dmin=0,
+            dmin=10,
             dmax=dmax,
             m1_low=6,
             m1_high=90,
@@ -879,14 +948,21 @@ def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
             m2_low=6,
             source_type=source_type,
         )
+        '''
 
     elif source_type == 'NSBH':
         dmax = 500
         if 'dmax' in kwargs.keys():
             dmax = kwargs['dmax']
+
+        samples = generate_random_inject_paras_fixMc(
+            Nsample=Nsample, dmin=10, dmax=dmax, a_max=0.1, source_type=source_type
+        )
+
+        '''
         samples = generate_random_inject_paras(
             Nsample=Nsample,
-            dmin=0,
+            dmin=10,
             dmax=dmax,
             m1_low=6,
             m1_high=90,
@@ -895,14 +971,20 @@ def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
             m2_low=1.1,
             source_type=source_type,
         )
+        '''
 
     elif source_type in ['BNS_EW_FD', 'BNS_EW_TD']:
         dmax = 1000
         if 'dmax' in kwargs.keys():
             dmax = kwargs['dmax']
+
+        samples = generate_random_inject_paras_fixMc(
+            Nsample=Nsample, dmin=10, dmax=dmax, a_max=0.1, source_type=source_type
+        )
+        '''
         samples = generate_random_inject_paras(
             Nsample=Nsample,
-            dmin=0,
+            dmin=10,
             dmax=dmax,
             m1_low=1.3,
             m1_high=1.5,
@@ -911,6 +993,7 @@ def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
             m2_low=1.1,
             source_type=source_type,
         )  # , pre_t=kwargs['pre_t'], flow=kwargs['flow']
+        '''
 
     else:
         raise Exception('Source type error!')

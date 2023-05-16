@@ -14,6 +14,7 @@ from ligo.skymap import postprocess
 from matplotlib import figure as Figure
 from matplotlib import pyplot as plt
 import time
+from pycbc.waveform import get_fd_waveform
 
 # export OMP_NUM_THREADS=8
 LAL_DET_MAP = dict(L1=6, H1=5, V1=2, K1=14, I1=15, CE=5, CEL=6, ET1=16, ET2=17, ET3=18)
@@ -152,6 +153,34 @@ def generate_healpix_grids(nside):
     dec = -theta + np.pi / 2
 
     return ra, dec
+
+
+def calculate_sigma_from_coinc(mass_1, mass_2, a_1, a_2, lambda_1, lambda_2):
+    sigmas = []
+
+    mass_1
+    hp, hc = get_fd_waveform(
+        approximant='TaylorF2',
+        mass1=mass_1,
+        mass2=mass_2,
+        distance=1,
+        inclination=0,
+        coa_phase=0,
+        lambda1=lambda_1,
+        lambda2=lambda_2,
+        spin1x=0,
+        spin1y=0,
+        spin1z=a_1,
+        spin2x=0,
+        spin2y=0,
+        spin2z=a_2,
+        delta_f=deltaf,
+        f_lower=20,
+        f_final=1024,
+        f_ref=50.0,
+    )
+
+    return np.array(sigmas)
 
 
 def deg2perpix(nlevel):

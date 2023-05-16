@@ -46,7 +46,7 @@ def main(
         seal2train = seal.Seal()
 
         # fitting
-        fitting_samples = seal2train.fitting_mu_sigma_snr_relation(
+        fitting_samples, _ = seal2train.fitting_mu_sigma_snr_relation(
             Nsample=nsample,
             det_name_list=det_name_list,
             source_type=source_type,

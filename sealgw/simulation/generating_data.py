@@ -45,7 +45,28 @@ def generate_random_spin(Nsample):
     return spin_x, spin_y, spin_z
 
 
-def generate_random_mass(Nsample, m1_low, m1_high, q_low, m2_low):
+def generate_random_mass(Nsample, source_type):
+    if source_type in ['BNS', 'BNS_EW_FD', 'BNS_EW_TD']:
+        m1_low = 1.1
+        m1_high = 2
+        q_low = 0.8
+        a_max = 0.1
+        m2_low = 1.1
+    elif source_type == 'BBH':
+        m1_low = 6
+        m1_high = 90
+        q_low = 0.25
+        a_max = 0.1
+        m2_low = 6
+    elif source_type == 'NSBH':
+        m1_low = 6
+        m1_high = 90
+        q_low = 0.05
+        a_max = 0.1
+        m2_low = 1.1
+    else:
+        raise Exception('Source type error!')
+
     m1 = np.random.uniform(low=m1_low, high=m1_high, size=Nsample)
 
     if m1_low > 5 and m2_low < 3:  # is NSBH
@@ -133,11 +154,6 @@ def generate_random_inject_paras(
     Nsample,
     dmin,
     dmax,
-    m1_low,
-    m1_high,
-    q_low,
-    a_max,
-    m2_low,
     source_type,
     fixed_mc=None,
     spin_type='aligned',
@@ -151,9 +167,7 @@ def generate_random_inject_paras(
             Nsample, source_type, fixed_mc
         )
     else:
-        mass_1, mass_2 = generate_random_mass(
-            Nsample, m1_low=m1_low, m1_high=m1_high, q_low=q_low, m2_low=m2_low
-        )
+        mass_1, mass_2 = generate_random_mass(Nsample, source_type)
         chirp_mass = component_masses_to_chirp_mass(mass_1, mass_2)
         mass_ratio = mass_2 / mass_1
 
@@ -724,7 +738,7 @@ def get_wave_gen(source_type, fmin, duration, sampling_frequency):
 
     elif source_type == 'BBH':
         waveform_arguments = dict(
-            waveform_approximant='IMRPhenomPv2',
+            waveform_approximant='IMRPhenomD',
             reference_frequency=50.0,
             minimum_frequency=fmin,
         )
@@ -875,7 +889,6 @@ def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
         Nsample=Nsample,
         dmin=10,
         dmax=dmax,
-        a_max=0.1,
         source_type=source_type,
         fixed_mc=fixed_mc,
     )

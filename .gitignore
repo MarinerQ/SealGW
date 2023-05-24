@@ -142,3 +142,4 @@ dmypy.json
 
 *.out
 .vscode/
+sealgw/calculation/cealcore.c

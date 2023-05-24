@@ -15,6 +15,7 @@ from .calculation.localization import (
     extract_info_from_xml,
     get_det_code_array,
     seal_with_adaptive_healpix,
+    seal_with_adaptive_healpix_v2,
 )
 from .simulation.generating_data import (
     get_example_injpara,
@@ -128,6 +129,7 @@ class Seal:
         custom_psd_path=None,
         low_snr_cutoff=None,
         high_snr_cutoff=None,
+        fixed_mc=None,
     ):
         if self.initialized:
             raise Exception("This seal is already initialized!")
@@ -154,13 +156,13 @@ class Seal:
             logger.warning(
                 f"Warning: Max luminosity distance is not provided. Using {horizon}Mpc."
             )
-            samples = get_fitting_source_para_sample(
-                source_type=source_type, Nsample=Nsample, dmax=horizon
-            )
-        else:
-            samples = get_fitting_source_para_sample(
-                source_type=source_type, Nsample=Nsample, dmax=dmax
-            )
+            dmax = horizon
+        samples = get_fitting_source_para_sample(
+            source_type=source_type,
+            Nsample=Nsample,
+            dmax=dmax,
+            fixed_mc=fixed_mc,
+        )
 
         manager = multiprocessing.Manager()
         snrs = manager.Array('d', range(Nsample))
@@ -263,6 +265,62 @@ class Seal:
             interp_factor,
             prior_mu,
             prior_sigma,
+            nthread,
+            max_snr_det_id,
+            interp_order,
+            use_timediff,
+            prior_type,
+        )
+        time2 = time.time()
+
+        if timecost:
+            return prob_skymap, time2 - time1
+        else:
+            return prob_skymap
+
+    def localize_v2(
+        self,
+        det_name_list,
+        time_arrays,
+        snr_arrays,
+        max_snr,
+        sigmas,
+        ntimes,
+        start_time,
+        end_time,
+        nthread,
+        max_distance,
+        min_distance=1.0,
+        nlevel=5,
+        interp_factor=8,
+        interp_order=0,
+        timecost=False,
+        use_timediff=True,
+        prior_type=0,
+    ):
+
+        det_code_array = get_det_code_array(det_name_list)
+        ndet = len(det_code_array)
+
+        max_snr_index = np.argmax(abs(snr_arrays))
+        cumulative_ntimes = np.cumsum(ntimes)
+        max_snr_det_id = np.searchsorted(cumulative_ntimes, max_snr_index)
+
+        time1 = time.time()
+        print('python flag: going to loc')
+        prob_skymap = seal_with_adaptive_healpix_v2(
+            nlevel,
+            time_arrays,
+            snr_arrays,
+            det_code_array.astype(ctypes.c_int32),
+            sigmas,
+            ntimes.astype(ctypes.c_int32),
+            ndet,
+            start_time,
+            end_time,
+            interp_factor,
+            min_distance,
+            max_distance,
             nthread,
             max_snr_det_id,
             interp_order,

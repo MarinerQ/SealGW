@@ -19,6 +19,7 @@
 #include <lal/DetResponse.h>
 
 #include <chealpix.h>
+#include <exponential_integral_Ei.h>
 
 COMPLEX16TimeSeries * 	XLALCreateCOMPLEX16TimeSeries (const CHAR *name, const LIGOTimeGPS *epoch, REAL8 f0, REAL8 deltaT, const LALUnit *sampleUnits, size_t length);
 
@@ -935,9 +936,7 @@ void _coherent_skymap_gaussian(
 }
 
 
-/*
-Coherent localization skymap with flat prior.
-*/
+/*not complete yet. do not use.*/
 void _coherent_snr(
 				double *coh_skymap_bi, // The probability skymap we want to return
 				const double *time_arrays,
@@ -1053,6 +1052,346 @@ void _coherent_snr(
 	} // end of for(grid_id)
 	} // end of omp
 }
+
+
+
+double dist_integral(double u, double lambda, double mu)
+{
+	if (fabs(lambda)<0.0001)
+	{
+		return -1*exp(mu)/7/pow(u,7);
+	}
+	else
+	{
+		//return 1.0;
+
+		double au = lambda*u;
+		double term1 = exp(mu)/5040/pow(u, 7);
+		double term2 = -1*exp(1*au)*(720 + 120*au + 24*pow(au,2) + 6*pow(au,3) +
+									2*pow(au,4) + pow(au,5) + pow(au,6));
+		double term3 = pow(au,7) * Exponential_Integral_Ei(au);
+
+		return term1 * (term2+term3);
+
+	}
+
+}
+double calcDistMarginTerm(double umin, double umax, double c1, double c2,
+						double alpha_r, double aplha_i, double beta_r, double beta_i)
+{
+	double erf_coeff = 1.69; // erf(x) ~ 1 - exp(-1.69x)
+	double logintegral=0;
+	double logsumintegral=-1000000000;
+	logsumintegral = 0.;
+
+	double mu = erf_coeff*(alpha_r+beta_r+aplha_i+beta_i);
+	double lambda;
+	double a1[2] = {-erf_coeff*c1, erf_coeff*c1};
+	double a2[2] = {-erf_coeff*c2, erf_coeff*c2};
+	double a3[2] = {-erf_coeff*c1, erf_coeff*c1};
+	double a4[2] = {-erf_coeff*c2, erf_coeff*c2};
+	int i,j,k,l;
+
+	for (i = 0; i < 2; i++)
+	{
+		for (j = 0; j < 2; j++)
+		{
+			for (k = 0; k < 2; k++)
+			{
+				for (l = 0; l < 2; l++)
+				{
+					lambda = a1[i]+a2[j]+a3[k]+a4[l];
+					//logintegral = log(dist_integral(umax, lambda, mu) - dist_integral(umin, lambda, mu));
+					//logsumintegral = logsumexp(logsumintegral, logintegral);
+
+					logintegral = dist_integral(umax, lambda, mu) - dist_integral(umin, lambda, mu);
+					//logintegral = 1.0;
+					logsumintegral += logintegral;
+				}
+
+			}
+
+		}
+
+	}// end of for
+
+	//logsumintegral = 1.0;
+	//printf("%f", logsumintegral);
+	return logsumintegral;
+}
+void _coherent_skymap_margindist(
+				double *coh_skymap_bi, // The probability skymap we want to return
+				const double *time_arrays,
+				COMPLEX16TimeSeries **snr_list,
+				LALDetector *detectors,
+				const double *sigmas,
+				const int *ntimes,
+				const int Ndet,
+				const int *argsort_pix_id,
+				const int nside,
+				const int ngrid,
+				const double start_time,
+				const double end_time,
+				const int ntime_interp,
+                const double min_distance,
+                const double max_distance,
+				const int nthread,
+				const int interp_order,
+				const int max_snr_det_id,
+				const int use_timediff,
+				const double premerger_time)
+{
+	int grid_id,time_id,det_id;
+
+	double dt = (end_time-start_time)/ntime_interp;
+	double ref_gps_time = (start_time + end_time)/2.0 - premerger_time;
+
+	LIGOTimeGPS ligo_gps_time;
+	ligo_gps_time.gpsSeconds = (int)(ref_gps_time);
+	ligo_gps_time.gpsNanoSeconds = (ref_gps_time-(int)(ref_gps_time)) * 1E9;
+
+	double umin = 1/max_distance;
+	double umax = 1/min_distance;
+
+	#pragma omp parallel num_threads(nthread) private(time_id,det_id)  shared(coh_skymap_bi,snr_list,detectors)
+	{
+	#pragma omp for
+	for(grid_id=0;grid_id<ngrid;grid_id+=1){
+		coh_skymap_bi[grid_id]=0;
+
+		double Gsigma[2*Ndet];
+		double M[4];
+
+		double ra, dec;
+		pix2ang_nest64(nside, argsort_pix_id[grid_id], &dec, &ra);
+		dec = M_PI/2 - dec;
+
+		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
+		//Calculate M
+		calcM(Gsigma, Ndet, M);
+		//Calculate M'^{-1} and M0'^{-1}
+        double M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22;
+		double aa = M[0];
+        double bb = M[1];
+        double cc = M[2];
+        double dd = M[3];
+        double detMprime = aa*dd - bb*cc;
+        M_inverse_11 = dd/(aa*dd-bb*cc);
+        M_inverse_12 = -cc/(aa*dd-bb*cc);
+        M_inverse_21 = -bb/(aa*dd-bb*cc);
+        M_inverse_22 = aa/(aa*dd-bb*cc);
+
+		double log_exp_term,log_margindist_term;
+		double j_r1,j_r2,j_i1,j_i2;
+		double log_prob_margT_bi=-1000000000;
+		double prefactor = log(detMprime);
+
+		double c1,c2;
+		c1 = (aa + fabs(bb))/sqrt(2*aa);
+		c2 = sqrt(detMprime/2/aa);
+
+		double alpha_r, aplha_i, beta_r, beta_i;
+
+		//transform matched filtering snr to j stream
+		double time_shifts[Ndet];
+		double time_shift;
+		double complex data;
+		double max_snr_det_dt = XLALTimeDelayFromEarthCenter((detectors[max_snr_det_id]).location,ra,dec,&ligo_gps_time);
+		double dt_ref=0.0;
+		if (use_timediff){dt_ref = max_snr_det_dt;}
+
+		for(det_id=0;det_id<Ndet;det_id++){
+			if(det_id==max_snr_det_id){
+				time_shifts[det_id] = max_snr_det_dt-dt_ref;
+			}
+			else{
+				time_shifts[det_id] = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time)-dt_ref;
+			}
+		}
+
+		for(time_id=0;time_id<ntime_interp;time_id++){
+			j_r1 = 0;
+			j_r2 = 0;
+			j_i1 = 0;
+			j_i2 = 0;
+
+			for(det_id=0;det_id<Ndet;det_id++){
+				time_shift = time_shifts[det_id];
+				data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
+
+				j_r1 += creal(data)*Gsigma[2*det_id];
+				j_i1 += cimag(data)*Gsigma[2*det_id];
+				j_r2 += creal(data)*Gsigma[2*det_id+1];
+				j_i2 += cimag(data)*Gsigma[2*det_id+1];
+
+			}
+			alpha_r = -1*j_r1 / sqrt(2*aa);
+			aplha_i = -1*j_i1 / sqrt(2*aa);
+			beta_r = (j_r1*bb-j_r2*aa)/sqrt(2*aa*detMprime);
+			beta_i = (j_i1*bb-j_i2*aa)/sqrt(2*aa*detMprime);
+
+			log_exp_term = calcExptermFlat(j_r1, j_r2,j_i1, j_i2,
+				prefactor,
+				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22);
+
+			//log_margindist_term = -1000;
+			//printf("flag2");
+			log_margindist_term = calcDistMarginTerm(umin, umax, c1,c2,
+										alpha_r, aplha_i, beta_r, beta_i);
+
+			log_margindist_term = log(fabs(log_margindist_term));
+			log_exp_term += log_margindist_term;
+
+			log_prob_margT_bi = logsumexp(log_prob_margT_bi,log_exp_term);
+		}
+
+		coh_skymap_bi[grid_id] = log_prob_margT_bi;
+	} // end of for(grid_id)
+	} // end of omp
+}
+
+/*
+Coherent localization skymap with v2 prior. Distance marginalized.
+
+void _coherent_skymap_margindist(
+				double *coh_skymap_bi, // The probability skymap we want to return
+				const double *time_arrays,
+				COMPLEX16TimeSeries **snr_list,
+				LALDetector *detectors,
+				const double *sigmas,
+				const int *ntimes,
+				const int Ndet,
+				const int *argsort_pix_id,
+				const int nside,
+				const int ngrid,
+				const double start_time,
+				const double end_time,
+				const int ntime_interp,
+                const double min_distance,
+                const double max_distance,
+				const int nthread,
+				const int interp_order,
+				const int max_snr_det_id,
+				const int use_timediff,
+				const double premerger_time)
+{
+	int grid_id,time_id,det_id;
+
+	double dt = (end_time-start_time)/ntime_interp;
+	double ref_gps_time = (start_time + end_time)/2.0 - premerger_time;
+
+	LIGOTimeGPS ligo_gps_time;
+	ligo_gps_time.gpsSeconds = (int)(ref_gps_time);
+	ligo_gps_time.gpsNanoSeconds = (ref_gps_time-(int)(ref_gps_time)) * 1E9;
+
+	double umin = 1/max_distance;
+	double umax = 1/min_distance;
+	//double mu_multimodal = prior_mu;
+	//double sigma_multimodal = prior_sigma;
+	//double xi = 1/sigma_multimodal/sigma_multimodal;
+	//double alpha = mu_multimodal*xi;
+	printf("flag: going to for grid");
+	#pragma omp parallel num_threads(nthread) private(time_id,det_id)  shared(coh_skymap_bi,snr_list,detectors)
+	{
+	#pragma omp for
+	for(grid_id=0;grid_id<ngrid;grid_id+=1){
+		coh_skymap_bi[grid_id]=0;
+
+		double Gsigma[2*Ndet];
+		double M[4];
+
+		double ra, dec;
+		pix2ang_nest64(nside, argsort_pix_id[grid_id], &dec, &ra);
+		dec = M_PI/2 - dec;
+
+		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
+		//Calculate M
+		calcM(Gsigma, Ndet, M);
+		//Calculate M'^{-1} and M0'^{-1}
+        double M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22;
+		double aa = M[0];
+        double bb = M[1];
+        double cc = M[2];
+        double dd = M[3];
+        double detMprime = aa*dd - bb*cc;
+        M_inverse_11 = dd/(aa*dd-bb*cc);
+        M_inverse_12 = -cc/(aa*dd-bb*cc);
+        M_inverse_21 = -bb/(aa*dd-bb*cc);
+        M_inverse_22 = aa/(aa*dd-bb*cc);
+
+		double log_exp_term;
+		double j_r1,j_r2,j_i1,j_i2;
+		double log_prob_margT_bi=-1000000000;
+		double prefactor = log(detMprime);
+
+		//transform matched filtering snr to j stream
+		double time_shifts[Ndet];
+		double time_shift;
+		double complex data;
+		double max_snr_det_dt = XLALTimeDelayFromEarthCenter((detectors[max_snr_det_id]).location,ra,dec,&ligo_gps_time);
+		double dt_ref=0.0;
+		if (use_timediff){dt_ref = max_snr_det_dt;}
+
+		for(det_id=0;det_id<Ndet;det_id++){
+			if(det_id==max_snr_det_id){
+				time_shifts[det_id] = max_snr_det_dt-dt_ref;
+			}
+			else{
+				time_shifts[det_id] = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time)-dt_ref;
+			}
+		}
+
+		double c1,c2;
+		//c1 = (aa + fabs(bb))/sqrt(2*aa);
+		//c2 = sqrt(detMprime/2/aa);
+
+		double alpha_r, aplha_i, beta_r, beta_i;
+		double log_margindist_term;
+
+		printf("flag: going to time mar");
+		for(time_id=0;time_id<ntime_interp;time_id++){
+			j_r1 = 0;
+			j_r2 = 0;
+			j_i1 = 0;
+			j_i2 = 0;
+
+			for(det_id=0;det_id<Ndet;det_id++){
+				time_shift = time_shifts[det_id];
+				data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
+
+				j_r1 += creal(data)*Gsigma[2*det_id];
+				j_i1 += cimag(data)*Gsigma[2*det_id];
+				j_r2 += creal(data)*Gsigma[2*det_id+1];
+				j_i2 += cimag(data)*Gsigma[2*det_id+1];
+
+			}
+
+			printf("flag: going to alpha");
+			//alpha_r = -1*j_r1 / sqrt(2*aa);
+			//aplha_i = -1*j_i1 / sqrt(2*aa);
+			//beta_r = (j_r1*bb-j_r2*aa)/sqrt(2*aa*detMprime);
+			//beta_i = (j_i1*bb-j_i2*aa)/sqrt(2*aa*detMprime);
+			printf("flag: end of alpha");
+			log_exp_term = calcExptermFlat(j_r1, j_r2,j_i1, j_i2,
+				prefactor,
+				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22);
+
+			printf("flag1");
+			//log_margindist_term = calcDistMarginTerm(umin, umax, c1,c2,
+			//							alpha_r, aplha_i, beta_r, beta_i);
+			log_margindist_term = -1000;
+			printf("flag2");
+			log_exp_term = logsumexp(log_exp_term,log_margindist_term);
+			log_prob_margT_bi = logsumexp(log_prob_margT_bi,log_exp_term);
+		}
+
+		coh_skymap_bi[grid_id] = log_prob_margT_bi;
+	} // end of for(grid_id)
+	} // end of omp
+}
+*/
+
+
 
 
 // Comparison function for qsort in descending order
@@ -1295,6 +1634,132 @@ void coherent_skymap_multires(
 				max_snr_det_id,
 				use_timediff,
 				premerger_time);
+			break;
+
+		default:
+			printf("Wrong prior type!\n");
+			exit(-1);
+		}
+
+
+
+		//update skymap
+		int nfactor = (int)pow(4,nlevel-i_level);
+		int index;
+		for(i=0;i<npix_base;i++){
+			index = argsort_pix_id[i];
+			for(j=0;j<nfactor;j++){
+				coh_skymap_multires[index*nfactor+j] = coh_skymap[i];
+			}
+		}
+
+		if(i_level<nlevel+1){
+			argsort = rank_OneOfFour(coh_skymap,npix_base);
+			for(i=0;i<npix_base/4;i++){
+				argsort_temp[i] = argsort_pix_id[argsort[i]];
+			}
+
+			// new pixel ids for the next loop
+			for(i=0;i<npix_base/4;i++){
+				for(j=0;j<4;j++){
+					argsort_pix_id[i*4+j] = argsort_temp[i]*4+j;
+				}
+			}
+		}
+
+	} // end of multires loop
+
+	normalize_log_probs(npix_final, coh_skymap_multires);
+
+	free(argsort);
+	free(argsort_temp);
+	free(argsort_pix_id);
+	free(coh_skymap);
+	DestroyCOMPLEX16TimeSeriesList(snr_list,Ndet);
+}
+
+
+
+void coherent_skymap_multires_v2(
+	double *coh_skymap_multires, // The probability skymap we want to return
+	const double *time_arrays,
+	const double complex *snr_arrays,
+	const int *detector_codes,
+	const double *sigmas,
+	const int *ntimes,
+	const int Ndet,
+	const double start_time,
+	const double end_time,
+	const int ntime_interp,
+	const double min_distance,
+	const double max_distance,
+	const int nthread,
+	const int interp_order,
+	const int max_snr_det_id,
+	const int nlevel,
+	const int use_timediff,
+	const int prior_type,
+	const double premerger_time)
+{
+	printf("flag: start");
+	int i,j,i_level;
+	int nside_base = 16;
+	int npix_base  = 12*nside_base*nside_base;
+
+	int nside_final = nside_base*pow(2,nlevel);
+	int npix_final = 12*nside_final*nside_final;
+
+	double *coh_skymap = (double*)malloc(sizeof(double)*npix_base);
+	//initialize the argsort
+	int *argsort        = (int*)malloc(sizeof(int)*npix_base/4);
+	int *argsort_temp   = (int*)malloc(sizeof(int)*npix_base/4);
+	int *argsort_pix_id = (int*)malloc(sizeof(int)*npix_base);
+	for(i=0;i<npix_base/4;i++){
+		argsort[i] = i;
+		for(j=0;j<4;j++){
+			argsort_pix_id[i*4+j] = i*4+j;
+		}
+	}
+
+	// pre-process data
+	COMPLEX16TimeSeries ** snr_list = CreateCOMPLEX16TimeSeriesList(time_arrays, snr_arrays, Ndet, ntimes);
+	LALDetector tempdet, detectors[Ndet];
+	int det_id;
+	for(det_id=0; det_id<Ndet; det_id++){
+		tempdet = lalCachedDetectors[detector_codes[det_id]];
+		detectors[det_id] = tempdet;
+	}
+
+	for(i_level=0;i_level<nlevel+1;i_level++){
+		int i_nside = nside_base*pow(2,i_level);
+		int i_npix  = 12*i_nside*i_nside;
+		//calculate skymap
+
+		switch (prior_type)
+		{
+		case 0:
+			_coherent_skymap_margindist(
+				coh_skymap, // The probability skymap we want to return
+				time_arrays,
+				snr_list,
+				detectors,
+				sigmas,
+				ntimes,
+				Ndet,
+				argsort_pix_id,
+				i_nside,
+				npix_base,
+				start_time,
+				end_time,
+				ntime_interp,
+				min_distance,
+				max_distance,
+				nthread,
+				interp_order,
+				max_snr_det_id,
+				use_timediff,
+				premerger_time);
+
 			break;
 
 		default:

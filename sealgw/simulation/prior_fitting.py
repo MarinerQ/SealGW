@@ -240,7 +240,7 @@ def find_horizon(ifos, waveform_generator, example_injection_parameter):
     return netsnr / 8
 
 
-def save_configs(source_types, label, seallist, outputfilename):
+def save_configs(source_types, seallist, outputfilename):
     if len(source_types) != len(seallist):
         raise Exception('len(source_types) != len(seallist).')
 

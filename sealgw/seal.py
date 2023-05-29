@@ -147,7 +147,7 @@ class Seal:
             source_type, fmin, duration, sampling_frequency
         )
         if dmax is None:
-            example_injection_parameter = get_example_injpara(source_type)
+            example_injection_parameter = get_example_injpara(source_type, self)
             horizon = find_horizon(
                 ifos, waveform_generator, example_injection_parameter
             )

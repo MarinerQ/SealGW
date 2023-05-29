@@ -53,11 +53,11 @@ def generate_random_mass(Nsample, source_type):
         a_max = 0.1
         m2_low = 1.1
     elif source_type == 'BBH':
-        m1_low = 6
+        m1_low = 10
         m1_high = 90
         q_low = 0.25
         a_max = 0.1
-        m2_low = 6
+        m2_low = 8
     elif source_type == 'NSBH':
         m1_low = 6
         m1_high = 90
@@ -157,6 +157,7 @@ def generate_random_inject_paras(
     source_type,
     fixed_mc=None,
     spin_type='aligned',
+    a_max=0.1,
     pre_t=None,
     flow=None,
 ):
@@ -785,7 +786,7 @@ def get_wave_gen(source_type, fmin, duration, sampling_frequency):
     return waveform_generator
 
 
-def get_example_injpara(source_type):
+def get_example_injpara(source_type, sealmodel):
     '''
     This function is used to generate an example injection parameter for (lower bound) horizon estimation.
     It therefore gives lighter masses.
@@ -811,11 +812,14 @@ def get_example_injpara(source_type):
         example_injection_parameter['lambda_1'] = 0
         example_injection_parameter['lambda_2'] = 425
 
-    elif source_type == 'BNS_EW_FD':
-        raise Exception('This function is under development!')
-
-    elif source_type == 'BNS_EW_TD':
-        raise Exception('This function is under development!')
+    elif source_type in ['BNS_EW_FD', 'BNS_EW_TD']:
+        mc = bilby.gw.conversion.component_masses_to_chirp_mass(1.4, 1.4)
+        example_injection_parameter['chirp_mass'] = mc
+        example_injection_parameter['mass_ratio'] = 1
+        example_injection_parameter['lambda_1'] = 425
+        example_injection_parameter['lambda_2'] = 425
+        example_injection_parameter['premerger_time_start'] = sealmodel.premerger_time_start
+        example_injection_parameter['premerger_time_end'] = sealmodel.premerger_time_end
 
     else:
         raise Exception('Source type error!')
@@ -873,6 +877,7 @@ def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
     fixed_mc = None
     if 'fixed_mc' in kwargs.keys():
         fixed_mc = kwargs['fixed_mc']
+        logging.debug(f'fixed mc at {fixed_mc}')
 
     default_dmax = {
         'BNS': 200,

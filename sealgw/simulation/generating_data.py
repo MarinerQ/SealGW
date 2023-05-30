@@ -384,7 +384,7 @@ def bns_truncated_fd_bilbypara(
     lambda_2,
     premerger_time_start,
     premerger_time_end,
-    **kwargs
+    **kwargs,
 ):
     mass_1, mass_2 = chirp_mass_and_mass_ratio_to_component_masses(
         chirp_mass, mass_ratio
@@ -465,7 +465,7 @@ def bns_truncated_fd_bilbypara_earth_rotation(
     lambda_2,
     premerger_time_start,
     premerger_time_end,
-    **kwargs
+    **kwargs,
 ):
     mass_1, mass_2 = chirp_mass_and_mass_ratio_to_component_masses(
         chirp_mass, mass_ratio
@@ -549,7 +549,7 @@ def bns_truncated_td_bilbypara(
     lambda_2,
     premerger_time,
     flow,
-    **kwargs
+    **kwargs,
 ):
     mass_1, mass_2 = chirp_mass_and_mass_ratio_to_component_masses(
         chirp_mass, mass_ratio
@@ -617,7 +617,7 @@ def bns_truncated_fd(
     lambda_2,
     premerger_time,
     flow,
-    **kwargs
+    **kwargs,
 ):
     fhigh = np.ceil(f_of_tau(premerger_time, m1=mass_1, m2=mass_2))
     deltaf = farray[1] - farray[0]
@@ -673,7 +673,7 @@ def bns_truncated_td(
     lambda_2,
     premerger_time,
     flow,
-    **kwargs
+    **kwargs,
 ):
     duration = np.ceil(tarray[-1] - tarray[0])
     if duration < premerger_time:
@@ -818,7 +818,9 @@ def get_example_injpara(source_type, sealmodel):
         example_injection_parameter['mass_ratio'] = 1
         example_injection_parameter['lambda_1'] = 425
         example_injection_parameter['lambda_2'] = 425
-        example_injection_parameter['premerger_time_start'] = sealmodel.premerger_time_start
+        example_injection_parameter[
+            'premerger_time_start'
+        ] = sealmodel.premerger_time_start
         example_injection_parameter['premerger_time_end'] = sealmodel.premerger_time_end
 
     else:
@@ -841,7 +843,14 @@ def get_example_injpara(source_type, sealmodel):
     return example_injection_parameter
 
 
-def get_ifos(det_name_list, duration, sampling_frequency, custom_psd_path):
+def get_ifos(
+    det_name_list,
+    duration,
+    sampling_frequency,
+    custom_psd_path,
+    f_low,
+    antenna_response_change=False,
+):
     # ifos = bilby.gw.detector.InterferometerList(det_name_list)
     from .sealinterferometers import SealInterferometerList
 
@@ -852,6 +861,7 @@ def get_ifos(det_name_list, duration, sampling_frequency, custom_psd_path):
         det = ifos[i]
         det.duration = duration
         det.sampling_frequency = sampling_frequency
+        det.antenna_response_change = antenna_response_change
         # psd_file = 'psd/{}/{}_psd.txt'.format(psd_label, det_name_list[i])
         if custom_psd_path:  # otherwise auto-set by bilby
             if type(custom_psd_path) == str and '.xml' in custom_psd_path:
@@ -870,6 +880,7 @@ def get_ifos(det_name_list, duration, sampling_frequency, custom_psd_path):
                 psd_file = custom_psd_path[i]
                 psd = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
             det.power_spectral_density = psd
+        det.frequency_mask = det.frequency_array >= f_low
     return ifos
 
 
@@ -886,9 +897,11 @@ def get_fitting_source_para_sample(source_type, Nsample, **kwargs):
         'BNS_EW_FD': 1000,
         'BNS_EW_TD': 1000,
     }
-    dmax = default_dmax[source_type]
+
     if 'dmax' in kwargs.keys():
         dmax = kwargs['dmax']
+    else:
+        dmax = default_dmax[source_type]
 
     samples = generate_random_inject_paras(
         Nsample=Nsample,

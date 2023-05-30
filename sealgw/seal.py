@@ -141,7 +141,9 @@ class Seal:
         #    if len(custom_psd_path) != len(det_name_list):
         #    raise Exception("Number of PSDs does not match number of detectors.")
 
-        ifos = get_ifos(det_name_list, duration, sampling_frequency, custom_psd_path)
+        ifos = get_ifos(
+            det_name_list, duration, sampling_frequency, custom_psd_path, fmin
+        )
         # waveform generator and samples
         waveform_generator = get_wave_gen(
             source_type, fmin, duration, sampling_frequency
@@ -413,19 +415,14 @@ class Seal:
         fmin,
     ):
         injection_parameters = get_inj_paras(samples[sample_ID], source_type)
-        ifos = SealInterferometerList(det_name_list)
-
-        # set detector paramaters
-        for i in range(len(ifos)):
-            det = ifos[i]
-            det.duration = duration
-            det.sampling_frequency = sampling_frequency
-            # psd_file = 'psd/{}/{}_psd.txt'.format(psd_label, det_name_list[i])
-            if custom_psd_path:  # otherwise auto-set by bilby
-                psd_file = custom_psd_path[i]
-                psd = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
-                det.power_spectral_density = psd
-            det.frequency_mask = det.frequency_array >= fmin
+        ifos = get_ifos(
+            det_name_list,
+            duration,
+            sampling_frequency,
+            custom_psd_path,
+            fmin,
+            antenna_response_change=False,
+        )
 
         ifos.set_strain_data_from_power_spectral_densities(
             sampling_frequency=sampling_frequency,
@@ -513,6 +510,7 @@ class Seal:
         custom_psd_path=None,
         det_name_list_full=None,
         prior_type=0,
+        dmax=None,
     ):
         if self.initialized == False:
             raise Exception("Seal not initialized!")
@@ -532,7 +530,26 @@ class Seal:
             source_type, fmin, duration, sampling_frequency
         )
         print("Generating source parameters...")
-        samples = get_fitting_source_para_sample(source_type, Nsample)
+        if dmax is None:
+            example_injection_parameter = get_example_injpara(source_type, self)
+            example_ifos = get_ifos(
+                det_name_list,
+                duration,
+                sampling_frequency,
+                custom_psd_path,
+                fmin,
+                antenna_response_change=False,
+            )
+            horizon = find_horizon(
+                example_ifos, waveform_generator, example_injection_parameter
+            )
+            # if source_type in ['BNS', 'NSBH']:
+            horizon = horizon / 3  # get more high SNR samples for fitting
+            logger.warning(
+                f"Warning: Max luminosity distance is not provided. Using {horizon}Mpc."
+            )
+            dmax = horizon
+        samples = get_fitting_source_para_sample(source_type, Nsample, dmax=dmax)
 
         manager = multiprocessing.Manager()
         Ncol = 6  # SNR, 50, 90, search, percentage, timecost
@@ -572,16 +589,23 @@ class SealBNSEW(Seal):
     '''
 
     def __init__(
-        self, config_dict=None, premerger_time_end=None, premerger_time_start=None
+        self,
+        config_dict=None,
+        source_type=None,
+        premerger_time_end=None,
+        premerger_time_start=None,
     ):
-        super(SealBNSEW, self).__init__(config_dict)
+        super(SealBNSEW, self).__init__(config_dict, source_type)
+        self.premerger_time_end = premerger_time_end
+        self.premerger_time_start = premerger_time_start
+        '''
         if config_dict is None:
             self.initialized = False
             self.description = "An uninitialized seal."
             self.premerger_time_end = premerger_time_end
             self.premerger_time_start = premerger_time_start
 
-        elif type(config_dict) == dict:
+        elif isinstance(config_dict, dict):
             self.prior_coef_a = config_dict['a']
             self.prior_coef_b = config_dict['b']
             self.prior_coef_c = config_dict['c']
@@ -591,7 +615,7 @@ class SealBNSEW(Seal):
             self.premerger_time_start = config_dict['premerger_time_start']
             self.initialized = True
 
-        elif type(config_dict) == str:
+        elif isinstance(config_dict, str):
             with open(config_dict) as f:
                 data = f.read()
             config_dict_from_file = json.loads(data)
@@ -603,6 +627,8 @@ class SealBNSEW(Seal):
             self.premerger_time_end = config_dict_from_file['premerger_time_end']
             self.premerger_time_start = config_dict_from_file['premerger_time_start']
             self.initialized = True
+        '''
+
         '''
         if config_dict:
             self.premerger_time = config_dict['premerger_time']
@@ -708,19 +734,14 @@ class SealBNSEW(Seal):
         injection_parameters = get_inj_paras(samples[sample_ID], source_type)
         injection_parameters['premerger_time_end'] = self.premerger_time_end
         injection_parameters['premerger_time_start'] = self.premerger_time_start
-        ifos = SealInterferometerList(det_name_list)
-        # set detector paramaters
-        for i in range(len(ifos)):
-            det = ifos[i]
-            det.duration = duration
-            det.sampling_frequency = sampling_frequency
-            # psd_file = 'psd/{}/{}_psd.txt'.format(psd_label, det_name_list[i])
-            if custom_psd_path:  # otherwise auto-set by bilby
-                psd_file = custom_psd_path[i]
-                psd = bilby.gw.detector.PowerSpectralDensity(psd_file=psd_file)
-                det.power_spectral_density = psd
-                det.antenna_response_change = True
-            det.frequency_mask = det.frequency_array >= fmin
+        ifos = get_ifos(
+            det_name_list,
+            duration,
+            sampling_frequency,
+            custom_psd_path,
+            fmin,
+            antenna_response_change=True,
+        )
 
         ifos.set_strain_data_from_power_spectral_densities(
             sampling_frequency=sampling_frequency,

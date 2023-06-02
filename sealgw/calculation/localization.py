@@ -117,7 +117,7 @@ def extract_info_from_xml(
 
     sigma_array = deff_array * max_snr_array
     if recalculate_sigmas:
-        sigma_array = calculate_template_norms(
+        sigma_dict = calculate_template_norms(
             postcoh['mass1'][0],
             postcoh['mass2'][0],
             postcoh['spin1z'][0],
@@ -126,6 +126,10 @@ def extract_info_from_xml(
             xmlfile['psds'],
             postcoh['f_final'][0],
         )
+
+    # key sequence in xmlfile['psds'] may be different from det_names
+    for i, det in enumerate(det_names):
+        sigma_array[i] = sigma_dict[det]
 
     trigger_time = trigger_time / len(det_names)  # mean of trigger times of each det
     if use_timediff:
@@ -161,7 +165,7 @@ def extract_info_from_xml(
 
 
 def calculate_template_norms(m1, m2, a1, a2, duration, psd_dict, f_final=1024):
-    sigma_list = []
+    sigma_dict = []
 
     mc = (m1 * m2) ** (3 / 5) / (m1 + m2) ** (1 / 5)
     if mc > 1.73:
@@ -169,14 +173,14 @@ def calculate_template_norms(m1, m2, a1, a2, duration, psd_dict, f_final=1024):
     else:
         approximant = 'TaylorF2'  # TaylorF2
     for detname, psdarray in psd_dict.items():
-        if len(sigma_list) == 0:
+        if len(sigma_dict) == 0:
             delta_f = (
                 1 / duration
             )  # psd_dict[detname].index[1]-psd_dict[detname].index[0]
             f_final = min(psd_dict[detname].index[-1], f_final)
             # remove biased PSD from 1000Hz in SPIIR trigger
-            if f_final > 1000:
-                f_final = 1000
+            if f_final > 980:
+                f_final = 980
             hp, hc = get_fd_waveform(
                 approximant=approximant,  # SEOBNRv4_ROM TaylorF2
                 mass1=m1,
@@ -206,9 +210,9 @@ def calculate_template_norms(m1, m2, a1, a2, duration, psd_dict, f_final=1024):
             hp.numpy()[mask], hp.numpy()[mask], psd_interp, 1 / delta_f
         )
         sigma = np.sqrt(np.real(sigma))
-        sigma_list.append(sigma)
+        sigma_dict[detname] = sigma
 
-    return np.array(sigma_list)
+    return sigma_dict
 
 
 def generate_healpix_grids(nside):
@@ -333,72 +337,6 @@ def seal_with_adaptive_healpix(
         ntime_interp,
         prior_mu,
         prior_sigma,
-        nthread,
-        interp_order,
-        max_snr_det_id,
-        nlevel,
-        use_timediff,
-        prior_type,
-        premerger_time,
-    )
-
-    # return normalize_log_probabilities(skymap_multires)
-    return skymap_multires
-
-
-def seal_with_adaptive_healpix_v2(
-    nlevel,
-    time_arrays,
-    snr_arrays,
-    det_code_array,
-    sigma_array,
-    ntimes_array,
-    ndet,
-    start_time,
-    end_time,
-    interp_factor,
-    min_distance,
-    max_distance,
-    nthread,
-    max_snr_det_id,
-    interp_order=0,
-    use_timediff=True,
-    prior_type=0,
-    premerger_time=0,
-):
-
-    # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
-    # Adaptive healpix: see Bayestar paper (and our seal paper).
-
-    nside_base = 16
-    nside_final = nside_base * 2**nlevel  # 16 *  [1,4,16,...,2^6]
-    npix_final = 12 * nside_final**2  # 12582912 for nlevel=6
-
-    # ra, dec = generate_healpix_grids(nside_final)
-    skymap_multires = np.zeros(npix_final)
-
-    dts = [
-        time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
-        for detid in range(ndet)
-    ]
-    ntime_interp = int(interp_factor * (end_time - start_time) / min(dts))
-    if use_timediff:
-        use_timediff = 1
-    else:
-        use_timediff = 0
-    sealcore.Pycoherent_skymap_multires_v2(
-        skymap_multires,
-        time_arrays,
-        snr_arrays,
-        det_code_array,
-        sigma_array,
-        ntimes_array,
-        ndet,
-        start_time,
-        end_time,
-        ntime_interp,
-        min_distance,
-        max_distance,
         nthread,
         interp_order,
         max_snr_det_id,

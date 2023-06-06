@@ -127,9 +127,9 @@ def extract_info_from_xml(
             postcoh['f_final'][0],
         )
 
-    # key sequence in xmlfile['psds'] may be different from det_names
-    for i, det in enumerate(det_names):
-        sigma_array[i] = sigma_dict[det]
+        # key sequence in xmlfile['psds'] may be different from det_names
+        for i, det in enumerate(det_names):
+            sigma_array[i] = sigma_dict[det]
 
     trigger_time = trigger_time / len(det_names)  # mean of trigger times of each det
     if use_timediff:
@@ -165,7 +165,7 @@ def extract_info_from_xml(
 
 
 def calculate_template_norms(m1, m2, a1, a2, duration, psd_dict, f_final=1024):
-    sigma_dict = []
+    sigma_dict = {}
 
     mc = (m1 * m2) ** (3 / 5) / (m1 + m2) ** (1 / 5)
     if mc > 1.73:
@@ -179,8 +179,8 @@ def calculate_template_norms(m1, m2, a1, a2, duration, psd_dict, f_final=1024):
             )  # psd_dict[detname].index[1]-psd_dict[detname].index[0]
             f_final = min(psd_dict[detname].index[-1], f_final)
             # remove biased PSD from 1000Hz in SPIIR trigger
-            if f_final > 980:
-                f_final = 980
+            if f_final > 972:
+                f_final = 972
             hp, hc = get_fd_waveform(
                 approximant=approximant,  # SEOBNRv4_ROM TaylorF2
                 mass1=m1,

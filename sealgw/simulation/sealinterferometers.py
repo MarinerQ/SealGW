@@ -329,7 +329,7 @@ class SealInterferometer(Interferometer):
         return signal_ifo
 
     def inject_signal_from_waveform_polarizations(
-        self, parameters, injection_polarizations, print_para=False
+        self, parameters, injection_polarizations, print_para=True, print_snr=True
     ):
         """Inject a signal into the detector from a dict of waveform polarizations.
         Alternative to `inject_signal` and `inject_signal_from_waveform_generator`.
@@ -359,15 +359,81 @@ class SealInterferometer(Interferometer):
             signal=signal_ifo
         )
         self.meta_data['parameters'] = parameters
-
-        logger.info("Injected signal in {}:".format(self.name))
-        logger.info("  optimal SNR = {:.2f}".format(self.meta_data['optimal_SNR']))
-        logger.info(
-            "  matched filter SNR = {:.2f}".format(self.meta_data['matched_filter_SNR'])
-        )
+        if print_snr:
+            logger.info("Injected signal in {}:".format(self.name))
+            logger.info("  optimal SNR = {:.2f}".format(self.meta_data['optimal_SNR']))
+            logger.info(
+                "  matched filter SNR = {:.2f}".format(
+                    self.meta_data['matched_filter_SNR']
+                )
+            )
         if print_para:
             for key in parameters:
                 logger.info('  {} = {}'.format(key, parameters[key]))
+
+    def inject_signal(
+        self,
+        parameters,
+        injection_polarizations=None,
+        waveform_generator=None,
+        raise_error=True,
+        print_snr=True,
+        print_para=True,
+    ):
+        """General signal injection method.
+        Provide the injection parameters and either the injection polarizations
+        or the waveform generator to inject a signal into the detector.
+        Defaults to the injection polarizations is both are given.
+
+        Parameters
+        ==========
+        parameters: dict
+            Parameters of the injection.
+        injection_polarizations: dict, optional
+           Polarizations of waveform to inject, output of
+           `waveform_generator.frequency_domain_strain()`. If
+           `waveform_generator` is also given, the injection_polarizations will
+           be calculated directly and this argument can be ignored.
+        waveform_generator: bilby.gw.waveform_generator.WaveformGenerator, optional
+            A WaveformGenerator instance using the source model to inject. If
+            `injection_polarizations` is given, this will be ignored.
+        raise_error: bool
+            If true, raise an error if the injected signal has a duration
+            longer than the data duration. If False, a warning will be printed
+            instead.
+
+        Notes
+        =====
+        if your signal takes a substantial amount of time to generate, or
+        you experience buggy behaviour. It is preferable to provide the
+        injection_polarizations directly.
+
+        Returns
+        =======
+        injection_polarizations: dict
+            The injected polarizations. This is the same as the injection_polarizations parameters
+            if it was passed in. Otherwise it is the return value of waveform_generator.frequency_domain_strain().
+
+        """
+        self.check_signal_duration(parameters, raise_error)
+
+        if injection_polarizations is None and waveform_generator is None:
+            raise ValueError(
+                "inject_signal needs one of waveform_generator or "
+                "injection_polarizations."
+            )
+        elif injection_polarizations is not None:
+            self.inject_signal_from_waveform_polarizations(
+                parameters=parameters,
+                injection_polarizations=injection_polarizations,
+                print_snr=print_snr,
+                print_para=print_para,
+            )
+        elif waveform_generator is not None:
+            injection_polarizations = self.inject_signal_from_waveform_generator(
+                parameters=parameters, waveform_generator=waveform_generator
+            )
+        return injection_polarizations
 
 
 class SealTriangularInterferometer(InterferometerList):
@@ -548,3 +614,66 @@ class SealInterferometerList(InterferometerList):
             else:
                 self.append(ifo)
         self._check_interferometers()
+
+    def inject_signal(
+        self,
+        parameters=None,
+        injection_polarizations=None,
+        waveform_generator=None,
+        raise_error=True,
+        print_para=True,
+        print_snr=True,
+    ):
+        """Inject a signal into noise in each of the three detectors.
+
+        Parameters
+        ==========
+        parameters: dict
+            Parameters of the injection.
+        injection_polarizations: dict
+           Polarizations of waveform to inject, output of
+           `waveform_generator.frequency_domain_strain()`. If
+           `waveform_generator` is also given, the injection_polarizations will
+           be calculated directly and this argument can be ignored.
+        waveform_generator: bilby.gw.waveform_generator.WaveformGenerator
+            A WaveformGenerator instance using the source model to inject. If
+            `injection_polarizations` is given, this will be ignored.
+        raise_error: bool
+            Whether to raise an error if the injected signal does not fit in
+            the segment.
+
+        Notes
+        =====
+        if your signal takes a substantial amount of time to generate, or
+        you experience buggy behaviour. It is preferable to provide the
+        injection_polarizations directly.
+
+        Returns
+        =======
+        injection_polarizations: dict
+
+        """
+        if injection_polarizations is None:
+            if waveform_generator is not None:
+                injection_polarizations = waveform_generator.frequency_domain_strain(
+                    parameters
+                )
+            else:
+                raise ValueError(
+                    "inject_signal needs one of waveform_generator or "
+                    "injection_polarizations."
+                )
+
+        all_injection_polarizations = list()
+        for interferometer in self:
+            all_injection_polarizations.append(
+                interferometer.inject_signal(
+                    parameters=parameters,
+                    injection_polarizations=injection_polarizations,
+                    raise_error=raise_error,
+                    print_para=print_para,
+                    print_snr=print_snr,
+                )
+            )
+
+        return all_injection_polarizations

@@ -10,10 +10,10 @@ from scipy.optimize import leastsq
 def select_aij_according_to_snr(file, low, high):
 
     # select
-    selected_a11 = file[np.where((file[:, 0] >= low) * (file[:, 1] < high))][:, 1]
-    selected_a12 = file[np.where((file[:, 0] >= low) * (file[:, 1] < high))][:, 2]
-    selected_a21 = file[np.where((file[:, 0] >= low) * (file[:, 1] < high))][:, 3]
-    selected_a22 = file[np.where((file[:, 0] >= low) * (file[:, 1] < high))][:, 4]
+    selected_a11 = file[np.where((file[:, 0] >= low) * (file[:, 0] < high))][:, 1]
+    selected_a12 = file[np.where((file[:, 0] >= low) * (file[:, 0] < high))][:, 2]
+    selected_a21 = file[np.where((file[:, 0] >= low) * (file[:, 0] < high))][:, 3]
+    selected_a22 = file[np.where((file[:, 0] >= low) * (file[:, 0] < high))][:, 4]
 
     # put aij together
     alist = np.array([])
@@ -240,7 +240,7 @@ def find_horizon(ifos, waveform_generator, example_injection_parameter):
     return netsnr / 8
 
 
-def save_configs(source_types, label, seallist, outputfilename):
+def save_configs(source_types, seallist, outputfilename):
     if len(source_types) != len(seallist):
         raise Exception('len(source_types) != len(seallist).')
 

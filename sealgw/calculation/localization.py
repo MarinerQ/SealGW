@@ -14,25 +14,55 @@ from ligo.skymap import postprocess
 from matplotlib import figure as Figure
 from matplotlib import pyplot as plt
 import time
+from pycbc.waveform import get_fd_waveform
+import bilby
+from gstlal import chirptime
 
 # export OMP_NUM_THREADS=8
+LAL_DET_MAP = dict(L1=6, H1=5, V1=2, K1=14, I1=15, CE=5, CEL=6, ET1=16, ET2=17, ET3=18)
 
 
 def cythontestfunc(ra, dec, gpstime, detcode):
     return sealcore.pytest1(ra, dec, gpstime, detcode)
 
 
+'''
 def lal_et_response_function(ra, dec, gpstime, psi, det_name, mode):
     mode201 = {'plus': 0, 'cross': 1}
-    name2code = {'ET1': 16, 'ET2': 17, 'ET3': 18}
+    #name2code = {'ET1': 16, 'ET2': 17, 'ET3': 18}
 
     mode_code = mode201[mode]
-    det_code = name2code[det_name]
+    #det_code = name2code[det_name]
+    det_code = LAL_DET_MAP[det_name]
 
-    return sealcore.Pyet_resp_func(ra, dec, gpstime, psi, det_code, mode_code)
+    return sealcore.Pylal_resp_func(ra, dec, gpstime, psi, det_code, mode_code)
 
 
-LAL_DET_MAP = dict(L1=6, H1=5, V1=2, K1=14, I1=15, CE=10, ET1=16, ET2=17, ET3=18)
+def lal_ce_response_function(ra, dec, gpstime, psi, mode):
+    mode201 = {'plus': 0, 'cross': 1}
+    mode_code = mode201[mode]
+
+    det_code = 10
+
+    return sealcore.Pylal_resp_func(ra, dec, gpstime, psi, det_code, mode_code)
+'''
+
+
+def lal_response_function(ra, dec, gpstime, psi, det_name, mode):
+    mode201 = {'plus': 0, 'cross': 1}
+    # name2code = {'ET1': 16, 'ET2': 17, 'ET3': 18}
+
+    mode_code = mode201[mode]
+    # det_code = name2code[det_name]
+    det_code = LAL_DET_MAP[det_name]
+
+    return sealcore.Pylal_resp_func(ra, dec, gpstime, psi, det_code, mode_code)
+
+
+def lal_dt_function(ra, dec, gpstime, det_name):
+    det_code = LAL_DET_MAP[det_name]
+
+    return sealcore.Pylal_dt_func(ra, dec, gpstime, det_code)
 
 
 logger = logging.getLogger(__name__)
@@ -49,7 +79,9 @@ def read_event_info(filepath):
     return trigger_time, ndet, det_codes, snrs, sigmas
 
 
-def extract_info_from_xml(filepath, return_names=False, use_timediff=True):
+def extract_info_from_xml(
+    filepath, return_names=False, use_timediff=True, recalculate_sigmas=True
+):
     import spiir.io.ligolw
 
     xmlfile = spiir.io.ligolw.load_coinc_xml(filepath)
@@ -84,8 +116,22 @@ def extract_info_from_xml(filepath, return_names=False, use_timediff=True):
         trigger_time += postcoh[f'end_time_ns_sngl_{det}'].item() * 1e-9
 
     sigma_array = deff_array * max_snr_array
-    trigger_time = trigger_time / len(det_names)  # mean of trigger times of each det
+    if recalculate_sigmas:
+        sigma_dict = calculate_template_norms(
+            postcoh['mass1'][0],
+            postcoh['mass2'][0],
+            postcoh['spin1z'][0],
+            postcoh['spin2z'][0],
+            postcoh['template_duration'][0],
+            xmlfile['psds'],
+            postcoh['f_final'][0],
+        )
 
+        # key sequence in xmlfile['psds'] may be different from det_names
+        for i, det in enumerate(det_names):
+            sigma_array[i] = sigma_dict[det]
+
+    trigger_time = trigger_time / len(det_names)  # mean of trigger times of each det
     if use_timediff:
         trigger_time = time_array[np.argmax(abs(snr_array))]
     logger.debug("xml processing done. ")
@@ -118,6 +164,57 @@ def extract_info_from_xml(filepath, return_names=False, use_timediff=True):
         )
 
 
+def calculate_template_norms(m1, m2, a1, a2, duration, psd_dict, f_final=1024):
+    sigma_dict = {}
+
+    mc = (m1 * m2) ** (3 / 5) / (m1 + m2) ** (1 / 5)
+    if mc > 1.73:
+        approximant = 'IMRPhenomD'
+    else:
+        approximant = 'TaylorF2'  # TaylorF2
+    for detname, psdarray in psd_dict.items():
+        if len(sigma_dict) == 0:
+            delta_f = (
+                1 / duration
+            )  # psd_dict[detname].index[1]-psd_dict[detname].index[0]
+            f_final = min(psd_dict[detname].index[-1], f_final)
+            # remove biased PSD from 1000Hz in SPIIR trigger
+            if f_final > 972:
+                f_final = 972
+            hp, hc = get_fd_waveform(
+                approximant=approximant,  # SEOBNRv4_ROM TaylorF2
+                mass1=m1,
+                mass2=m2,
+                distance=1,
+                inclination=0,
+                coa_phase=0,
+                spin1x=0,
+                spin1y=0,
+                spin1z=a1,
+                spin2x=0,
+                spin2y=0,
+                spin2z=a2,
+                delta_f=delta_f,
+                f_lower=20,
+                f_final=f_final,
+            )
+
+        hp_farray = hp.sample_frequencies.numpy()
+        mask = hp_farray < f_final
+        psd_interp = np.interp(
+            hp.sample_frequencies.numpy()[mask],
+            psd_dict[detname].index,
+            psd_dict[detname].values,
+        )
+        sigma = bilby.gw.utils.noise_weighted_inner_product(
+            hp.numpy()[mask], hp.numpy()[mask], psd_interp, 1 / delta_f
+        )
+        sigma = np.sqrt(np.real(sigma))
+        sigma_dict[detname] = sigma
+
+    return sigma_dict
+
+
 def generate_healpix_grids(nside):
     npix = hp.nside2npix(nside)  # equiv to 12*nside^2
     theta, phi = hp.pixelfunc.pix2ang(nside, np.arange(npix), nest=True)
@@ -125,6 +222,36 @@ def generate_healpix_grids(nside):
     dec = -theta + np.pi / 2
 
     return ra, dec
+
+
+'''
+def calculate_template_norm(mass_1, mass_2, ):
+    sigmas = []
+
+    mass_1
+    hp, hc = get_fd_waveform(
+        approximant='TaylorF2',
+        mass1=mass_1,
+        mass2=mass_2,
+        distance=1,
+        inclination=0,
+        coa_phase=0,
+        lambda1=lambda_1,
+        lambda2=lambda_2,
+        spin1x=0,
+        spin1y=0,
+        spin1z=a_1,
+        spin2x=0,
+        spin2y=0,
+        spin2z=a_2,
+        delta_f=deltaf,
+        f_lower=20,
+        f_final=1024,
+        f_ref=50.0,
+    )
+
+    return np.array(sigmas)
+'''
 
 
 def deg2perpix(nlevel):
@@ -174,6 +301,8 @@ def seal_with_adaptive_healpix(
     max_snr_det_id,
     interp_order=0,
     use_timediff=True,
+    prior_type=0,
+    premerger_time=0,
 ):
 
     # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
@@ -195,7 +324,7 @@ def seal_with_adaptive_healpix(
         use_timediff = 1
     else:
         use_timediff = 0
-    sealcore.Pycoherent_skymap_multires_bicorr(
+    sealcore.Pycoherent_skymap_multires(
         skymap_multires,
         time_arrays,
         snr_arrays,
@@ -213,158 +342,12 @@ def seal_with_adaptive_healpix(
         max_snr_det_id,
         nlevel,
         use_timediff,
+        prior_type,
+        premerger_time,
     )
 
     # return normalize_log_probabilities(skymap_multires)
     return skymap_multires
-
-
-'''
-# Multi resolution in python, slower than pure C, especially when nlevel > 5.
-def seal_with_adaptive_healpix(
-    nlevel,
-    time_arrays,
-    snr_arrays,
-    det_code_array,
-    sigma_array,
-    ntimes_array,
-    ndet,
-    start_time,
-    end_time,
-    interp_factor,
-    prior_mu,
-    prior_sigma,
-    nthread,
-    max_snr_det_id,
-    interp_order=0,
-    use_timediff=True,
-):
-
-    # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
-    # Adaptive healpix: see Bayestar paper (and our seal paper).
-    nside_base = 16
-    npix_base = 12 * nside_base**2  # 12*16*16=3072
-
-    nside_final = nside_base * 2**nlevel  # 16 *  [1,4,16,...,2^6]
-    npix_final = 12 * nside_final**2  # 12582912 for nlevel=6
-
-    # ra, dec = generate_healpix_grids(nside_final)
-    skymap_multires = np.zeros(npix_final)
-
-    # let n_time be aligned with the finest sampled detector
-    # (as we allow different sampling rates)
-    # dts = []
-    # for detid in range(ndet):
-    #    dts.append(
-    #        time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
-    #    )
-    dts = [
-        time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
-        for detid in range(ndet)
-    ]
-    ntime_interp = int(interp_factor * (end_time - start_time) / min(dts))
-
-    # Initialize argsort
-    argsort = np.arange(npix_base / 4)
-    argsort_pix_id = np.arange(npix_base)
-    t0 = time.time()
-    for ilevel in range(nlevel + 1):
-        t1 = time.time()
-        iside = nside_base * 2**ilevel
-        # ipix = 12 * iside**2
-        #ra_for_this_level, dec_for_this_level = generate_healpix_grids(
-        #    iside
-        #)  # len(ra_for_this_level) == ipix
-
-        # Calculate the first 1/4 most probable grids from previous level
-        # len(ra_to_calculate) == npix_base
-        #ra_to_calculate = ra_for_this_level[argsort_pix_id]
-        #dec_to_calculate = dec_for_this_level[argsort_pix_id]
-
-        # Calculate skymap (of log prob density)
-        coh_skymap_for_this_level = np.zeros(npix_base)
-        t2 = time.time()
-        print(f'prepare time {t2-t1}')
-        if use_timediff:
-            sealcore.Pycoherent_skymap_bicorr_usetimediff(
-                coh_skymap_for_this_level,
-                time_arrays,
-                snr_arrays,
-                det_code_array,
-                sigma_array,
-                ntimes_array,
-                ndet,
-                #ra_to_calculate,
-                #dec_to_calculate,
-                argsort_pix_id.astype(ctypes.c_int32),
-                iside,
-                npix_base,
-                start_time,
-                end_time,
-                ntime_interp,
-                prior_mu,
-                prior_sigma,
-                nthread,
-                interp_order,
-                max_snr_det_id,
-            )
-        else:
-            sealcore.Pycoherent_skymap_bicorr(
-                coh_skymap_for_this_level,
-                time_arrays,
-                snr_arrays,
-                det_code_array,
-                sigma_array,
-                ntimes_array,
-                ndet,
-                ra_to_calculate,
-                dec_to_calculate,
-                npix_base,
-                start_time,
-                end_time,
-                ntime_interp,
-                prior_mu,
-                prior_sigma,
-                nthread,
-                interp_order,
-            )
-        t3 = time.time()
-        print(f'time cost of calculating skymap: {t3-t2}')
-        # Update skymap
-        nfactor = 4 ** (
-            nlevel - ilevel
-        )  # map a pixel of this level to multiple pixels in the final level
-
-        if ilevel == 0 or ilevel == 1:
-            for i in range(npix_base):
-                index = argsort_pix_id[i]
-                skymap_multires[
-                    index * nfactor : (index + 1) * nfactor
-                ] = coh_skymap_for_this_level[i]
-        else:
-            # This part faster (by 10x) than the for loop above when ilevel>=2,
-            # but slower (by 3x) when ilevel=0,1.
-            # Anyway, this if-else saves about 5-10ms...
-            index_array = argsort_pix_id.reshape(-1, 1) * nfactor + np.arange(nfactor)
-            skymap_multires[index_array.ravel()] = coh_skymap_for_this_level.repeat(
-                nfactor
-            )
-
-        # Update argsort
-        argsort = np.argsort(coh_skymap_for_this_level)[::-1][: int(npix_base / 4)]
-        argsort_temp = argsort_pix_id[argsort]
-
-        for j in range(4):
-            # map to next-level grids-to-calculate
-            argsort_pix_id[j::4] = argsort_temp * 4 + j
-        t4 = time.time()
-        print(f'time cost of updating skymap: {t4-t3}')
-    tn = time.time()
-    print(f'all loops time: {tn-t0}')
-    skymap_multires = normalize_log_probabilities(skymap_multires)
-    print(f'norm time: {time.time()-tn}')
-    return skymap_multires
-'''
 
 
 def get_det_code_array(det_name_list):

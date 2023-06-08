@@ -315,10 +315,13 @@ def seal_with_adaptive_healpix(
     # ra, dec = generate_healpix_grids(nside_final)
     skymap_multires = np.zeros(npix_final)
 
-    dts = [
-        time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
-        for detid in range(ndet)
-    ]
+    if len(det_code_array) == 1:
+        dts = [time_arrays[1] - time_arrays[0]]
+    else:
+        dts = [
+            time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
+            for detid in range(ndet)
+        ]
     ntime_interp = int(interp_factor * (end_time - start_time) / min(dts))
     if use_timediff:
         use_timediff = 1

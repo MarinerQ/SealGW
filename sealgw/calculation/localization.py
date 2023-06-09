@@ -224,36 +224,6 @@ def generate_healpix_grids(nside):
     return ra, dec
 
 
-'''
-def calculate_template_norm(mass_1, mass_2, ):
-    sigmas = []
-
-    mass_1
-    hp, hc = get_fd_waveform(
-        approximant='TaylorF2',
-        mass1=mass_1,
-        mass2=mass_2,
-        distance=1,
-        inclination=0,
-        coa_phase=0,
-        lambda1=lambda_1,
-        lambda2=lambda_2,
-        spin1x=0,
-        spin1y=0,
-        spin1z=a_1,
-        spin2x=0,
-        spin2y=0,
-        spin2z=a_2,
-        delta_f=deltaf,
-        f_lower=20,
-        f_final=1024,
-        f_ref=50.0,
-    )
-
-    return np.array(sigmas)
-'''
-
-
 def deg2perpix(nlevel):
     """
     nside_base:  16
@@ -302,7 +272,7 @@ def seal_with_adaptive_healpix(
     interp_order=0,
     use_timediff=True,
     prior_type=0,
-    premerger_time=0,
+    premerger_time=np.array([]),
 ):
 
     # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
@@ -327,6 +297,10 @@ def seal_with_adaptive_healpix(
         use_timediff = 1
     else:
         use_timediff = 0
+
+    if len(premerger_time) == 0:
+        premerger_time = np.zeros(ndet)
+
     sealcore.Pycoherent_skymap_multires(
         skymap_multires,
         time_arrays,
@@ -415,6 +389,8 @@ def apply_fudge_factor(probs: np.ndarray, fudge_percent: float) -> np.ndarray:
     e.g., if 95% area gets 90% simulations right, the fudge_percent 0.95. The top 95% of prob skymap
     will be multiplied by 90/95 so that it becomes 90% area.
 
+    Another way of applying fudge factors is multiplying a factor to SNR series directly, which is used in SPIIR search.
+
     """
     # Find the top values that summed up to 0.9 in probs
     sorted_probs = np.sort(probs)[::-1]
@@ -445,6 +421,11 @@ def confidence_area(probs, confidence_level):
 
     credible_levels = 100 * postprocess.find_greedy_credible_levels(probs)
     area = np.searchsorted(np.sort(credible_levels), confidence_level) * deg2perpix
+    for i in range(len(area)):
+        #  the max prob pixel contains prob more than this confidence level
+        if area[i] == 0:
+            #  assume prob is uniform within this pixel
+            area[i] = deg2perpix * confidence_level[i] / min(credible_levels)
 
     return area
 
@@ -512,6 +493,13 @@ def catalog_test_statistics(probs, ra_inj, dec_inj):
     credible_levels = 100 * postprocess.find_greedy_credible_levels(probs)
     levels = [50, 90]
     confidence_areas = np.searchsorted(np.sort(credible_levels), levels) * deg2perpix
+    for i in range(len(confidence_areas)):
+        #  the max prob pixel contains prob more than this confidence level
+        if confidence_areas[i] == 0:
+            #  assume prob is uniform within this pixel
+            confidence_areas[i] = (
+                deg2perpix * confidence_level[i] / min(credible_levels)
+            )
 
     return confidence_areas, search_area, inj_point_cumulative_percentage
 

@@ -497,9 +497,7 @@ def catalog_test_statistics(probs, ra_inj, dec_inj):
         #  the max prob pixel contains prob more than this confidence level
         if confidence_areas[i] == 0:
             #  assume prob is uniform within this pixel
-            confidence_areas[i] = (
-                deg2perpix * confidence_level[i] / min(credible_levels)
-            )
+            confidence_areas[i] = deg2perpix * levels[i] / min(credible_levels)
 
     return confidence_areas, search_area, inj_point_cumulative_percentage
 

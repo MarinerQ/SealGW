@@ -20,6 +20,7 @@
 
 #include <chealpix.h>
 #include <exponential_integral_Ei.h>
+#include <sealCachedDetectors.h>
 
 COMPLEX16TimeSeries * 	XLALCreateCOMPLEX16TimeSeries (const CHAR *name, const LIGOTimeGPS *epoch, REAL8 f0, REAL8 deltaT, const LALUnit *sampleUnits, size_t length);
 
@@ -341,6 +342,14 @@ double calcExptermFlat(double j_r1, double j_r2,double j_i1, double j_i2,
 	return log_exp_term;
 }
 
+LALDetector get_cached_detector(int detcode){
+	if(detcode<100){
+		return lalCachedDetectors[detcode];
+	}
+	else{
+		return get_cached_sealdetector(detcode);
+	}
+}
 
 double lal_resp_func(double ra, double dec, double gpstime, double psi, int detcode, int mode){
 	/*
@@ -353,7 +362,8 @@ double lal_resp_func(double ra, double dec, double gpstime, double psi, int detc
 	gps_time_ligo.gpsNanoSeconds = (int)(gpstime-(int)gpstime)*1000000000;
 	gmst = XLALGreenwichMeanSiderealTime(&gps_time_ligo);
 
-	tempdet = lalCachedDetectors[detcode];
+	//tempdet = lalCachedDetectors[detcode];
+	tempdet = get_cached_detector(detcode);
 	//ComputeDetAMResponse(&fplus,&fcross,tempdet.response,ra,dec,psi,gmst);
 	XLALComputeDetAMResponse(&fplus,&fcross,tempdet.response,ra,dec,psi,gmst);
 
@@ -373,7 +383,8 @@ double lal_dt_func(double ra, double dec, double gpstime, int detcode){
 	Bilby has different geometry for ET&CE from LAL. This function calculate time delay from geocenter in LAL.
 	*/
 	LALDetector tempdet;
-	tempdet = lalCachedDetectors[detcode];
+	//tempdet = lalCachedDetectors[detcode];
+	tempdet = get_cached_detector(detcode);
 
 	LIGOTimeGPS gps_time_ligo;
 	gps_time_ligo.gpsSeconds = (int)gpstime;
@@ -975,125 +986,6 @@ void _coherent_skymap_gaussian(
 }
 
 
-/*//not complete yet. do not use.
-void _coherent_snr(
-				double *coh_skymap_bi, // The probability skymap we want to return
-				const double *time_arrays,
-				COMPLEX16TimeSeries **snr_list,
-				LALDetector *detectors,
-				const double *sigmas,
-				const int *ntimes,
-				const int Ndet,
-				const int *argsort_pix_id,
-				const int nside,
-				const int ngrid,
-				const double start_time,
-				const double end_time,
-				const int ntime_interp,
-                const double prior_mu,
-                const double prior_sigma,
-				const int nthread,
-				const int interp_order,
-				const int max_snr_det_id,
-				const int use_timediff,
-				const double *premerger_time)
-{
-	int grid_id,time_id,det_id;
-
-	double dt = (end_time-start_time)/ntime_interp;
-	double ref_gps_time = (start_time + end_time)/2.0 - premerger_time[0];
-
-	LIGOTimeGPS ligo_gps_time;
-	ligo_gps_time.gpsSeconds = (int)(ref_gps_time);
-	ligo_gps_time.gpsNanoSeconds = (ref_gps_time-(int)(ref_gps_time)) * 1E9;
-
-	double coh_snr,coh_snr_temp;
-
-	//double mu_multimodal = prior_mu;
-	//double sigma_multimodal = prior_sigma;
-	//double xi = 1/sigma_multimodal/sigma_multimodal;
-	//double alpha = mu_multimodal*xi;
-	#pragma omp parallel num_threads(nthread) private(time_id,det_id)  shared(coh_skymap_bi,snr_list,detectors)
-	{
-	#pragma omp for
-	for(grid_id=0;grid_id<ngrid;grid_id+=1){
-		coh_skymap_bi[grid_id]=0;
-
-		double Gsigma[2*Ndet];
-		double M[4];
-
-		double ra, dec;
-		pix2ang_nest64(nside, argsort_pix_id[grid_id], &dec, &ra);
-		dec = M_PI/2 - dec;
-
-		getGsigma_matrix(detectors,sigmas,Ndet,ra,dec,ref_gps_time,Gsigma);
-		//Calculate M
-		calcM(Gsigma, Ndet, M);
-		//Calculate M'^{-1} and M0'^{-1}
-        double M_inverse_11,M_inverse_12,M_inverse_21,M_inverse_22;
-		double aa = M[0];
-        double bb = M[1];
-        double cc = M[2];
-        double dd = M[3];
-        double detMprime = aa*dd - bb*cc;
-        M_inverse_11 = dd/(aa*dd-bb*cc);
-        M_inverse_12 = -cc/(aa*dd-bb*cc);
-        M_inverse_21 = -bb/(aa*dd-bb*cc);
-        M_inverse_22 = aa/(aa*dd-bb*cc);
-
-		double log_exp_term;
-		double j_r1,j_r2,j_i1,j_i2;
-		double log_prob_margT_bi=-1000000000;
-		double prefactor = log(detMprime);
-
-		//transform matched filtering snr to j stream
-		double time_shifts[Ndet];
-		double time_shift;
-		double complex data;
-		double max_snr_det_dt = XLALTimeDelayFromEarthCenter((detectors[max_snr_det_id]).location,ra,dec,&ligo_gps_time);
-		double dt_ref=0.0;
-		if (use_timediff){dt_ref = max_snr_det_dt;}
-
-		for(det_id=0;det_id<Ndet;det_id++){
-			if(det_id==max_snr_det_id){
-				time_shifts[det_id] = max_snr_det_dt-dt_ref;
-			}
-			else{
-				time_shifts[det_id] = XLALTimeDelayFromEarthCenter((detectors[det_id]).location,ra,dec,&ligo_gps_time)-dt_ref;
-			}
-		}
-
-		for(time_id=0;time_id<ntime_interp;time_id++){
-			j_r1 = 0;
-			j_r2 = 0;
-			j_i1 = 0;
-			j_i2 = 0;
-
-			for(det_id=0;det_id<Ndet;det_id++){
-				time_shift = time_shifts[det_id];
-				data = interpolate_time_series(snr_list[det_id], start_time + time_id*dt + time_shift, interp_order);
-
-				j_r1 += creal(data)*Gsigma[2*det_id];
-				j_i1 += cimag(data)*Gsigma[2*det_id];
-				j_r2 += creal(data)*Gsigma[2*det_id+1];
-				j_i2 += cimag(data)*Gsigma[2*det_id+1];
-
-			}
-
-			coh_snr_temp = calcExptermFlat(j_r1, j_r2,j_i1, j_i2,
-				0.0,
-				M_inverse_11, M_inverse_12, M_inverse_21, M_inverse_22);
-
-			log_prob_margT_bi = logsumexp(log_prob_margT_bi,log_exp_term);
-		}
-
-		coh_skymap_bi[grid_id] = log_prob_margT_bi;
-	} // end of for(grid_id)
-	} // end of omp
-}
-*/
-
-
 // Comparison function for qsort in descending order
 int compare_descending(const void *a, const void *b) {
     double val_a = *(const double *)a;
@@ -1229,7 +1121,8 @@ void coherent_skymap_multires(
 	LALDetector tempdet, detectors[Ndet];
 	int det_id;
 	for(det_id=0; det_id<Ndet; det_id++){
-		tempdet = lalCachedDetectors[detector_codes[det_id]];
+		//tempdet = lalCachedDetectors[detector_codes[det_id]];
+		tempdet = get_cached_detector(detector_codes[det_id]);
 		detectors[det_id] = tempdet;
 	}
 

@@ -19,33 +19,28 @@ import bilby
 from gstlal import chirptime
 
 # export OMP_NUM_THREADS=8
-LAL_DET_MAP = dict(L1=6, H1=5, V1=2, K1=14, I1=15, CE=5, CEL=6, ET1=16, ET2=17, ET3=18)
+LAL_DET_MAP = dict(
+    L1=6,
+    H1=5,
+    V1=2,
+    K1=14,
+    I1=15,
+    CE=5,
+    CEL=6,
+    ET1=16,
+    ET2=17,
+    ET3=18,
+    M1=100,
+    M2=101,
+    M3=102,
+    Z1=103,
+    Z2=104,
+    Z3=105,
+)
 
 
 def cythontestfunc(ra, dec, gpstime, detcode):
     return sealcore.pytest1(ra, dec, gpstime, detcode)
-
-
-'''
-def lal_et_response_function(ra, dec, gpstime, psi, det_name, mode):
-    mode201 = {'plus': 0, 'cross': 1}
-    #name2code = {'ET1': 16, 'ET2': 17, 'ET3': 18}
-
-    mode_code = mode201[mode]
-    #det_code = name2code[det_name]
-    det_code = LAL_DET_MAP[det_name]
-
-    return sealcore.Pylal_resp_func(ra, dec, gpstime, psi, det_code, mode_code)
-
-
-def lal_ce_response_function(ra, dec, gpstime, psi, mode):
-    mode201 = {'plus': 0, 'cross': 1}
-    mode_code = mode201[mode]
-
-    det_code = 10
-
-    return sealcore.Pylal_resp_func(ra, dec, gpstime, psi, det_code, mode_code)
-'''
 
 
 def lal_response_function(ra, dec, gpstime, psi, det_name, mode):

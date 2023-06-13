@@ -448,90 +448,6 @@ def bns_truncated_fd_bilbypara(
     return waveform_polarizations
 
 
-def bns_truncated_fd_bilbypara_earth_rotation(
-    farray,
-    chirp_mass,
-    mass_ratio,
-    a_1,
-    a_2,
-    luminosity_distance,
-    phase,
-    theta_jn,
-    ra,
-    dec,
-    psi,
-    geocent_time,
-    lambda_1,
-    lambda_2,
-    premerger_time_start,
-    premerger_time_end,
-    **kwargs,
-):
-    mass_1, mass_2 = chirp_mass_and_mass_ratio_to_component_masses(
-        chirp_mass, mass_ratio
-    )
-
-    # flow = np.floor(f_of_tau(premerger_time_start, m1=mass_1, m2=mass_2))
-
-    # I want to pad t_pad[seconds] in time domain to deal with IFT contamination
-    # i.e. df = |df/dtau| * t_pad
-    t_pad = 4
-    f_pad = -t_pad * df_dtau(premerger_time_start, mc=chirp_mass)
-    flow = f_of_tau(premerger_time_start, mc=chirp_mass) - f_pad
-
-    if premerger_time_end == 0:
-        fhigh = farray[-1]
-    else:
-        f_pad = -t_pad * df_dtau(premerger_time_end, mc=chirp_mass)
-        # fhigh = np.ceil(f_of_tau(premerger_time_end, m1=mass_1, m2=mass_2))
-        fhigh = f_of_tau(premerger_time_end, mc=chirp_mass) + f_pad
-    deltaf = farray[1] - farray[0]
-    approx = 'TaylorF2'  # TaylorF2 IMRPhenomPv2 IMRPhenomPv2_NRTidalv2
-    waveform_polarizations = {}
-
-    # The following two return values are pycbc frequency series
-    # with frequency stamp from 0 to fhigh.
-    # The data between 0 and flow are padded with zeros
-    waveform_polarizations['plus'], waveform_polarizations['cross'] = get_fd_waveform(
-        approximant=approx,
-        mass1=mass_1,
-        mass2=mass_2,
-        distance=luminosity_distance,
-        inclination=theta_jn,
-        coa_phase=phase,
-        lambda1=lambda_1,
-        lambda2=lambda_2,
-        spin1x=0,
-        spin1y=0,
-        spin1z=a_1,
-        spin2x=0,
-        spin2y=0,
-        spin2z=a_2,
-        delta_f=deltaf,
-        f_lower=flow,
-        f_final=fhigh,
-        f_ref=50.0,
-    )
-
-    # Since we already have freq stamp from 0 to fhigh, we just need to
-    # pad between fhigh and farray[-1], which is behind our current waveform
-    N_gw = len(waveform_polarizations['plus'])
-    N_wave_gen = len(farray)
-    try:
-        zero_array = np.zeros(N_wave_gen - N_gw)
-    except:
-        print(N_wave_gen, N_gw)
-
-    dt = tau_of_f(farray, mc=chirp_mass)
-    dt[0] = dt[1]  # remove nan
-    for mode in waveform_polarizations.keys():
-        waveform_polarizations[mode] = np.append(
-            waveform_polarizations[mode], zero_array
-        )
-        # waveform_polarizations[mode] *= np.exp(-2 * np.pi * 1j * farray * dt)
-    return waveform_polarizations
-
-
 def bns_truncated_td_bilbypara(
     tarray,
     chirp_mass,
@@ -765,19 +681,28 @@ def get_wave_gen(source_type, fmin, duration, sampling_frequency):
         )
 
     elif source_type == 'BNS_EW_FD':
+        waveform_arguments = dict(
+            reference_frequency=50.0,
+        )
+
         waveform_generator = bilby.gw.WaveformGenerator(
             duration=duration,
             sampling_frequency=sampling_frequency,
             frequency_domain_source_model=bns_truncated_fd_bilbypara,
             parameter_conversion=convert_to_lal_binary_neutron_star_parameters,
+            waveform_arguments=waveform_arguments,
         )
 
     elif source_type == 'BNS_EW_TD':
+        waveform_arguments = dict(
+            reference_frequency=50.0,
+        )
         waveform_generator = bilby.gw.WaveformGenerator(
             duration=duration,
             sampling_frequency=sampling_frequency,
             time_domain_source_model=bns_truncated_td_bilbypara,
             parameter_conversion=convert_to_lal_binary_neutron_star_parameters,
+            waveform_arguments=waveform_arguments,
         )
 
     else:

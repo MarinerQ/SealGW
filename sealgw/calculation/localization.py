@@ -19,33 +19,28 @@ import bilby
 from gstlal import chirptime
 
 # export OMP_NUM_THREADS=8
-LAL_DET_MAP = dict(L1=6, H1=5, V1=2, K1=14, I1=15, CE=5, CEL=6, ET1=16, ET2=17, ET3=18)
+LAL_DET_MAP = dict(
+    L1=6,
+    H1=5,
+    V1=2,
+    K1=14,
+    I1=15,
+    CE=5,
+    CEL=6,
+    ET1=16,
+    ET2=17,
+    ET3=18,
+    M1=100,
+    M2=101,
+    M3=102,
+    Z1=103,
+    Z2=104,
+    Z3=105,
+)
 
 
 def cythontestfunc(ra, dec, gpstime, detcode):
     return sealcore.pytest1(ra, dec, gpstime, detcode)
-
-
-'''
-def lal_et_response_function(ra, dec, gpstime, psi, det_name, mode):
-    mode201 = {'plus': 0, 'cross': 1}
-    #name2code = {'ET1': 16, 'ET2': 17, 'ET3': 18}
-
-    mode_code = mode201[mode]
-    #det_code = name2code[det_name]
-    det_code = LAL_DET_MAP[det_name]
-
-    return sealcore.Pylal_resp_func(ra, dec, gpstime, psi, det_code, mode_code)
-
-
-def lal_ce_response_function(ra, dec, gpstime, psi, mode):
-    mode201 = {'plus': 0, 'cross': 1}
-    mode_code = mode201[mode]
-
-    det_code = 10
-
-    return sealcore.Pylal_resp_func(ra, dec, gpstime, psi, det_code, mode_code)
-'''
 
 
 def lal_response_function(ra, dec, gpstime, psi, det_name, mode):
@@ -224,36 +219,6 @@ def generate_healpix_grids(nside):
     return ra, dec
 
 
-'''
-def calculate_template_norm(mass_1, mass_2, ):
-    sigmas = []
-
-    mass_1
-    hp, hc = get_fd_waveform(
-        approximant='TaylorF2',
-        mass1=mass_1,
-        mass2=mass_2,
-        distance=1,
-        inclination=0,
-        coa_phase=0,
-        lambda1=lambda_1,
-        lambda2=lambda_2,
-        spin1x=0,
-        spin1y=0,
-        spin1z=a_1,
-        spin2x=0,
-        spin2y=0,
-        spin2z=a_2,
-        delta_f=deltaf,
-        f_lower=20,
-        f_final=1024,
-        f_ref=50.0,
-    )
-
-    return np.array(sigmas)
-'''
-
-
 def deg2perpix(nlevel):
     """
     nside_base:  16
@@ -302,7 +267,7 @@ def seal_with_adaptive_healpix(
     interp_order=0,
     use_timediff=True,
     prior_type=0,
-    premerger_time=0,
+    premerger_time=np.array([]),
 ):
 
     # Healpix: The Astrophysical Journal, 622:759–771, 2005. See its Figs. 3 & 4.
@@ -315,15 +280,22 @@ def seal_with_adaptive_healpix(
     # ra, dec = generate_healpix_grids(nside_final)
     skymap_multires = np.zeros(npix_final)
 
-    dts = [
-        time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
-        for detid in range(ndet)
-    ]
+    if len(det_code_array) == 1:
+        dts = [time_arrays[1] - time_arrays[0]]
+    else:
+        dts = [
+            time_arrays[ntimes_array[detid] + 1] - time_arrays[ntimes_array[detid]]
+            for detid in range(ndet)
+        ]
     ntime_interp = int(interp_factor * (end_time - start_time) / min(dts))
     if use_timediff:
         use_timediff = 1
     else:
         use_timediff = 0
+
+    if len(premerger_time) == 0:
+        premerger_time = np.zeros(ndet)
+
     sealcore.Pycoherent_skymap_multires(
         skymap_multires,
         time_arrays,
@@ -412,6 +384,8 @@ def apply_fudge_factor(probs: np.ndarray, fudge_percent: float) -> np.ndarray:
     e.g., if 95% area gets 90% simulations right, the fudge_percent 0.95. The top 95% of prob skymap
     will be multiplied by 90/95 so that it becomes 90% area.
 
+    Another way of applying fudge factors is multiplying a factor to SNR series directly, which is used in SPIIR search.
+
     """
     # Find the top values that summed up to 0.9 in probs
     sorted_probs = np.sort(probs)[::-1]
@@ -442,6 +416,11 @@ def confidence_area(probs, confidence_level):
 
     credible_levels = 100 * postprocess.find_greedy_credible_levels(probs)
     area = np.searchsorted(np.sort(credible_levels), confidence_level) * deg2perpix
+    for i in range(len(area)):
+        #  the max prob pixel contains prob more than this confidence level
+        if area[i] == 0:
+            #  assume prob is uniform within this pixel
+            area[i] = deg2perpix * confidence_level[i] / min(credible_levels)
 
     return area
 
@@ -509,6 +488,11 @@ def catalog_test_statistics(probs, ra_inj, dec_inj):
     credible_levels = 100 * postprocess.find_greedy_credible_levels(probs)
     levels = [50, 90]
     confidence_areas = np.searchsorted(np.sort(credible_levels), levels) * deg2perpix
+    for i in range(len(confidence_areas)):
+        #  the max prob pixel contains prob more than this confidence level
+        if confidence_areas[i] == 0:
+            #  assume prob is uniform within this pixel
+            confidence_areas[i] = deg2perpix * levels[i] / min(credible_levels)
 
     return confidence_areas, search_area, inj_point_cumulative_percentage
 

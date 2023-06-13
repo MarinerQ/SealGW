@@ -39,7 +39,7 @@ cdef extern from "sealcore.h":
 		const int nlevel,
 		const int use_timediff,
 		const int prior_type,
-		const double premerger_time);
+		const double *premerger_time);
 
 
 def Pycoherent_skymap_multires(
@@ -61,7 +61,7 @@ def Pycoherent_skymap_multires(
 				const int nlevel,
 				const int use_timediff,
 				const int prior_type,
-				const double premerger_time,): # 'arr' is a one-dimensional numpy array
+				const double[:] premerger_time,): # 'arr' is a one-dimensional numpy array
 
     #if not coh_skymap_bicorr.flags['C_CONTIGUOUS']:
 	# Makes a contiguous copy of the numpy array.
@@ -88,7 +88,7 @@ def Pycoherent_skymap_multires(
 			nlevel,
 			use_timediff,
 			prior_type,
-			premerger_time
+			&premerger_time[0]
 	)
 
     return coh_skymap_multires

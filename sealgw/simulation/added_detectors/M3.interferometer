@@ -1,0 +1,13 @@
+# MYET3_Netherlands
+#
+#
+name = 'M3'
+power_spectral_density = PowerSpectralDensity(psd_file='ET15km_PSD.txt')
+length = 15
+minimum_frequency = 10
+maximum_frequency = 2048
+latitude = 50 + 43. / 60 + 23. / 3600
+longitude = 5 + 55. / 60 + 14. / 3600
+elevation = 0.
+xarm_azimuth = 329.7562821
+yarm_azimuth = 59.7562821

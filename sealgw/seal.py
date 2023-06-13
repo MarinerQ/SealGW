@@ -597,6 +597,7 @@ class SealBNSEW(Seal):
         timecost=False,
         use_timediff=True,
         prior_type=0,
+        premerger_time_array=np.array([]),
     ):
         if not self.initialized:
             raise Exception("Seal not initialized!")
@@ -610,6 +611,9 @@ class SealBNSEW(Seal):
         max_snr_index = np.argmax(abs(snr_arrays))
         cumulative_ntimes = np.cumsum(ntimes)
         max_snr_det_id = np.searchsorted(cumulative_ntimes, max_snr_index)
+
+        if len(premerger_time_array) == 0:
+            premerger_time_array = np.zeros(ndet) + self.premerger_time_end
 
         time1 = time.time()
         prob_skymap = seal_with_adaptive_healpix(
@@ -630,7 +634,7 @@ class SealBNSEW(Seal):
             interp_order,
             use_timediff,
             prior_type,
-            self.premerger_time_end,
+            premerger_time_array,
         )
         time2 = time.time()
 

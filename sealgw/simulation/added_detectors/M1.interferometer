@@ -1,0 +1,13 @@
+# MYET1_Sardinia
+#
+#
+name = 'M1'
+power_spectral_density = PowerSpectralDensity(psd_file='ET15km_PSD.txt')
+length = 15
+minimum_frequency = 10
+maximum_frequency = 2048
+latitude = 40 + 31. / 60 + 0. / 3600
+longitude = 9 + 25. / 60 + 0. / 3600
+elevation = 300.
+xarm_azimuth = 102.247323
+yarm_azimuth = 192.247323

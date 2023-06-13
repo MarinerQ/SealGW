@@ -159,7 +159,7 @@ class SealInterferometer(Interferometer):
 
         """
         if mode in ["plus", "cross", "x", "y", "breathing", "longitudinal"]:
-            if self.name in ['ET1', 'ET2', 'ET3', 'CE', 'CEL']:
+            if self.name in ['ET1', 'ET2', 'ET3', 'CE', 'CEL', 'M1', 'M2', 'M3']:
                 return lal_response_function(ra, dec, time, psi, self.name, mode)
             else:
                 polarization_tensor = get_polarization_tensor(ra, dec, time, psi, mode)
@@ -190,7 +190,7 @@ class SealInterferometer(Interferometer):
         =======
         float: The time delay from geocenter in seconds
         """
-        if self.name in ['ET1', 'ET2', 'ET3', 'CE', 'CEL']:
+        if self.name in ['ET1', 'ET2', 'ET3', 'CE', 'CEL', 'M1', 'M2', 'M3']:
             return lal_dt_function(ra, dec, time, self.name)
         else:
             # print('!!!!!!')
@@ -532,7 +532,7 @@ def get_empty_Sealinterferometer(name):
         SealInterferometer instance
     """
 
-    if name in ['CEL']:
+    if name in ['CEL', 'M1', 'M2', 'M3']:
         filename = os.path.join(
             os.path.dirname(__file__),
             "added_detectors",

@@ -8,10 +8,6 @@ from bilby.gw.conversion import (
     convert_to_lal_binary_neutron_star_parameters,
 )
 from lal import LIGOTimeGPS
-from pycbc.filter import matched_filter
-from pycbc.types.frequencyseries import FrequencySeries
-from pycbc.types.timeseries import TimeSeries
-from pycbc.waveform import get_fd_waveform, get_td_waveform
 import logging
 
 # fmt: off
@@ -386,6 +382,13 @@ def bns_truncated_fd_bilbypara(
     premerger_time_end,
     **kwargs,
 ):
+    if 'wf_func' in kwargs.keys():  # add in waveform_arguemnt
+        wf_func = kwargs['wf_func']
+    else:
+        from pycbc.waveform import get_fd_waveform
+
+        wf_func = get_fd_waveform
+
     mass_1, mass_2 = chirp_mass_and_mass_ratio_to_component_masses(
         chirp_mass, mass_ratio
     )
@@ -411,7 +414,7 @@ def bns_truncated_fd_bilbypara(
     # The following two return values are pycbc frequency series
     # with frequency stamp from 0 to fhigh.
     # The data between 0 and flow are padded with zeros
-    waveform_polarizations['plus'], waveform_polarizations['cross'] = get_fd_waveform(
+    waveform_polarizations['plus'], waveform_polarizations['cross'] = wf_func(
         approximant=approx,
         mass1=mass_1,
         mass2=mass_2,
@@ -448,6 +451,7 @@ def bns_truncated_fd_bilbypara(
     return waveform_polarizations
 
 
+'''
 def bns_truncated_td_bilbypara(
     tarray,
     chirp_mass,
@@ -635,6 +639,7 @@ def bns_truncated_td(
         )
 
     return waveform_polarizations
+'''
 
 
 def get_wave_gen(source_type, fmin, duration, sampling_frequency):
@@ -852,6 +857,10 @@ def snr_generator(ifos, waveform_generator, injection_parameter, flow=None, fhig
     snr_timeseries_list: a list of snr timeseries (pycbc timeseries)
     sigma_list: a list of sigmas
     """
+    from pycbc.filter import matched_filter
+    from pycbc.types.frequencyseries import FrequencySeries
+    from pycbc.types.timeseries import TimeSeries
+
     injection_parameters_copy = injection_parameter.copy()
     injection_parameters_copy["theta_jn"] = 0
     injection_parameters_copy["luminosity_distance"] = 1
@@ -927,6 +936,10 @@ def snr_generator_fd(
     snr_timeseries_list: a list of snr timeseries (pycbc timeseries)
     sigma_list: a list of sigmas
     """
+    from pycbc.filter import matched_filter
+    from pycbc.types.frequencyseries import FrequencySeries
+    from pycbc.types.timeseries import TimeSeries
+
     injection_parameters_copy = injection_parameter.copy()
     injection_parameters_copy["theta_jn"] = 0
     injection_parameters_copy["luminosity_distance"] = 1

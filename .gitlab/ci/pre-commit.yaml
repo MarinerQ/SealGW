@@ -1,0 +1,13 @@
+image: python:3.10.2-slim-bullseye
+
+pre-commit:
+  stage: lint
+  before_script:
+    - apt update && apt install -y --no-install-recommends git
+    - /usr/local/bin/python -m pip install --upgrade pip
+    - pip install pre-commit
+  script:
+    - pre-commit run --all-files
+  rules:
+    - if:  $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if:  ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "dev")

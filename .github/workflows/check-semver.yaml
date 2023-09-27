@@ -1,0 +1,18 @@
+name: check-semver
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+jobs:
+  check-semver:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Check diff
+      run: |
+        SEMVER_CHANGED=$(git diff $CI_MERGE_REQUEST_DIFF_BASE_SHA...HEAD setup.py | grep "version=")
+        if [ -z "$SEMVER_CHANGED" ]; then exit 1; else exit 0; fi
+

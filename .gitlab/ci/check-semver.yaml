@@ -1,0 +1,11 @@
+check-semver:
+  stage: lint
+  image:
+    name: alpine/git
+    entrypoint: [""]
+  script:
+    - git fetch
+    - SEMVER_CHANGED=$(git diff $CI_MERGE_REQUEST_DIFF_BASE_SHA...HEAD setup.py | grep "version=")
+    - if [ -z "$SEMVER_CHANGED" ]; then exit 1; else exit 0; fi
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev")

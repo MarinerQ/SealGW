@@ -7,3 +7,4 @@ stages:
 
 include:
   - local: '/.gitlab/ci/check-semver.yaml'
+  - local: '/.gitlab/ci/publish.yaml'

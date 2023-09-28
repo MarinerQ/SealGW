@@ -27,11 +27,14 @@
     # an alternative approach is to install and run:
     - pip install dist/*
     # run the command here
-    - pip install build twine
+    - pip install build twine auditwheel
     - python -m build
+    - pushd dist
+    - auditwheel repair *.whl -w . --plat manylinux_2_35_x86_64
+    - popd
   artifacts:
     paths:
-      - dist/*.whl
+      - dist/*manylinux*.whl
 
 gitlab-publish:
   extends:

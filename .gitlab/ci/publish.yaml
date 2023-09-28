@@ -21,6 +21,7 @@
     - pip install virtualenv
     - virtualenv venv
     - source venv/bin/activate
+    - pip install numpy Cython
     - python setup.py bdist_wheel
     # an alternative approach is to install and run:
     - pip install dist/*

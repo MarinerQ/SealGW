@@ -34,7 +34,7 @@
     - popd
   artifacts:
     paths:
-      - dist/*manylinux*.whl
+      - dist/*.whl
 
 gitlab-publish:
   extends:
@@ -48,7 +48,7 @@ test-pypi-publish:
   extends:
     - .publish
   script:
-    - TWINE_PASSWORD=${TEST_PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload --repository testpypi dist/*
+    - TWINE_PASSWORD=${TEST_PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload --repository testpypi dist/*manylinux*
   rules:
     - if:  $CI_COMMIT_BRANCH == "dev"
 
@@ -56,6 +56,6 @@ pypi-publish:
   extends:
     - .publish
   script:
-    - TWINE_PASSWORD=${PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload dist/*
+    - TWINE_PASSWORD=${PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload dist/*manylinux*
   rules:
     - if:  $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -28,7 +28,7 @@ install_requires = [
 
 setup(
     name='sealgw',
-    version="0.0.2",
+    version="0.0.3",
     description='SealGW: SEmi-Analytical Localization for Gravitational Waves',
     author='Qian Hu',
     author_email='q.hu.2@research.gla.ac.uk',

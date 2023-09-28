@@ -14,7 +14,8 @@ from ligo.skymap import postprocess
 from matplotlib import figure as Figure
 from matplotlib import pyplot as plt
 import time
-from pycbc.waveform import get_fd_waveform
+import lal
+import lalsimulation
 import bilby
 from gstlal import chirptime
 
@@ -161,14 +162,17 @@ def extract_info_from_xml(
 
 def calculate_template_norms(m1, m2, a1, a2, duration, psd_dict, f_final=1024):
     sigma_dict = {}
-
+    Msun = lal.MSUN_SI
+    Mpc = lal.PC_SI * 1e6
+    f_low = 20
+    f_ref = 50
     mc = (m1 * m2) ** (3 / 5) / (m1 + m2) ** (1 / 5)
-    if mc > 1.73:
-        approximant = 'IMRPhenomD'
-    else:
-        approximant = 'TaylorF2'  # TaylorF2
+    # if mc > 1.73:
+    #    approximant = 'IMRPhenomD'
+    # else:
+    #    approximant = 'TaylorF2'  # TaylorF2
     for detname, psdarray in psd_dict.items():
-        if len(sigma_dict) == 0:
+        if len(sigma_dict) == 0:  # only calculate waveform once
             delta_f = (
                 1 / duration
             )  # psd_dict[detname].index[1]-psd_dict[detname].index[0]
@@ -176,33 +180,54 @@ def calculate_template_norms(m1, m2, a1, a2, duration, psd_dict, f_final=1024):
             # remove biased PSD from 1000Hz in SPIIR trigger
             if f_final > 972:
                 f_final = 972
-            hp, hc = get_fd_waveform(
-                approximant=approximant,  # SEOBNRv4_ROM TaylorF2
-                mass1=m1,
-                mass2=m2,
-                distance=1,
-                inclination=0,
-                coa_phase=0,
-                spin1x=0,
-                spin1y=0,
-                spin1z=a1,
-                spin2x=0,
-                spin2y=0,
-                spin2z=a2,
-                delta_f=delta_f,
-                f_lower=20,
-                f_final=f_final,
-            )
 
-        hp_farray = hp.sample_frequencies.numpy()
-        mask = hp_farray < f_final
+            if mc < 1.73:
+                hp_complex16series = lalsimulation.SimInspiralTaylorF2(
+                    0,
+                    delta_f,
+                    m1 * Msun,
+                    m2 * Msun,
+                    a1,
+                    a2,
+                    f_low,
+                    f_final,
+                    f_ref,
+                    Mpc,
+                    {},
+                )
+            else:
+                hp_complex16series = lalsimulation.SimIMRPhenomDGenerateFD(
+                    0,
+                    f_ref,
+                    delta_f,
+                    m1 * Msun,
+                    m2 * Msun,
+                    a1,
+                    a2,
+                    f_low,
+                    f_final,
+                    Mpc,
+                    {},
+                    2,
+                )
+
+            hp_farray = np.arange(
+                hp_complex16series.f0,
+                hp_complex16series.f0
+                + hp_complex16series.data.length * hp_complex16series.deltaF,
+                hp_complex16series.deltaF,
+            )
+            mask = hp_farray < f_final
         psd_interp = np.interp(
-            hp.sample_frequencies.numpy()[mask],
+            hp_farray[mask],
             psd_dict[detname].index,
             psd_dict[detname].values,
         )
         sigma = bilby.gw.utils.noise_weighted_inner_product(
-            hp.numpy()[mask], hp.numpy()[mask], psd_interp, 1 / delta_f
+            hp_complex16series.data.data[mask],
+            hp_complex16series.data.data[mask],
+            psd_interp,
+            1 / delta_f,
         )
         sigma = np.sqrt(np.real(sigma))
         sigma_dict[detname] = sigma

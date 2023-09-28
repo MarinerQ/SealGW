@@ -1,6 +1,6 @@
 .publish:
   stage: deploy
-  image: continuumio/miniconda3
+  image: python:3.10.2-bullseye
 
   # Change pip's cache directory to be inside the project directory since we can
   # only cache local items.
@@ -17,21 +17,16 @@
       - .cache/pip
       - venv/
   before_script:
-    - conda create -n publisher -c conda-forge python=3.10 gstlal-inspiral gcc chealpix
-    - conda init bash
-    - source ~/.bashrc
-    - conda activate publisher
     - python --version  # For debugging
-    - pip install numpy Cython
+    - pip install virtualenv
+    - virtualenv venv
+    - source venv/bin/activate
     - python setup.py bdist_wheel
     # an alternative approach is to install and run:
     - pip install dist/*
     # run the command here
-    - pip install build twine auditwheel patchelf
+    - pip install build twine
     - python -m build
-    - pushd dist
-    - auditwheel repair *.whl -w . --plat manylinux_2_35_x86_64
-    - popd
   artifacts:
     paths:
       - dist/*.whl
@@ -42,13 +37,13 @@ gitlab-publish:
   script:
     - TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
   rules:
-    - if:  ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "dev" || ($CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"))
+    - if:  ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "dev")
 
 test-pypi-publish:
   extends:
     - .publish
   script:
-    - TWINE_PASSWORD=${TEST_PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload --repository testpypi dist/*manylinux*
+    - TWINE_PASSWORD=${TEST_PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload --repository testpypi dist/*
   rules:
     - if:  $CI_COMMIT_BRANCH == "dev"
 
@@ -56,6 +51,6 @@ pypi-publish:
   extends:
     - .publish
   script:
-    - TWINE_PASSWORD=${PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload dist/*manylinux*
+    - TWINE_PASSWORD=${PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload dist/*
   rules:
     - if:  $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

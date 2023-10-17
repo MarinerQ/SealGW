@@ -1,6 +1,6 @@
 .publish:
   stage: deploy
-  image: python:3.10.2-bullseye
+  image: continuumio/miniconda3
 
   # Change pip's cache directory to be inside the project directory since we can
   # only cache local items.
@@ -17,15 +17,17 @@
       - .cache/pip
       - venv/
   before_script:
+    - conda create -n publisher -c conda-forge python=3.10 gstlal-inspiral gcc chealpix
+    - conda init bash
+    - source ~/.bashrc
+    - conda activate publisher
     - python --version  # For debugging
-    - pip install virtualenv
-    - virtualenv venv
-    - source venv/bin/activate
+    - pip install numpy Cython
     - python setup.py bdist_wheel
     # an alternative approach is to install and run:
     - pip install dist/*
     # run the command here
-    - pip install build twine
+    - pip install build twine auditwheel patchelf
     - python -m build
 <<<<<<< HEAD
 =======
@@ -33,6 +35,9 @@
     - auditwheel repair *.whl -w . --plat manylinux_2_28_x86_64
     - popd
 >>>>>>> d563fe6 (Fix pypi publish.)
+    - pushd dist
+    - auditwheel repair *.whl -w . --plat manylinux_2_35_x86_64
+    - popd
   artifacts:
     paths:
       - dist/*
@@ -43,13 +48,13 @@ gitlab-publish:
   script:
     - TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
   rules:
-    - if:  ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "dev")
+    - if:  ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "dev" || ($CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"))
 
 test-pypi-publish:
   extends:
     - .publish
   script:
-    - TWINE_PASSWORD=${TEST_PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload --repository testpypi dist/*
+    - TWINE_PASSWORD=${TEST_PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload --repository testpypi dist/*manylinux*
   rules:
     - if:  $CI_COMMIT_BRANCH == "dev"
 
@@ -57,6 +62,6 @@ pypi-publish:
   extends:
     - .publish
   script:
-    - TWINE_PASSWORD=${PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload dist/*
+    - TWINE_PASSWORD=${PYPI_TOKEN} TWINE_USERNAME=__token__ python -m twine upload dist/*manylinux*
   rules:
     - if:  $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

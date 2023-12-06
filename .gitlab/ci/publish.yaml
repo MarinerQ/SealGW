@@ -33,6 +33,7 @@
 =======
     - pushd dist
     - auditwheel repair *.whl -w . --plat manylinux_2_28_x86_64
+    - rm *linux_x86_64.whl
     - popd
 >>>>>>> d563fe6 (Fix pypi publish.)
     - pushd dist

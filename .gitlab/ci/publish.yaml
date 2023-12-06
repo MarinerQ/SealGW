@@ -27,9 +27,15 @@
     # run the command here
     - pip install build twine
     - python -m build
+<<<<<<< HEAD
+=======
+    - pushd dist
+    - auditwheel repair *.whl -w . --plat manylinux_2_28_x86_64
+    - popd
+>>>>>>> d563fe6 (Fix pypi publish.)
   artifacts:
     paths:
-      - dist/*.whl
+      - dist/*
 
 gitlab-publish:
   extends:

@@ -6,6 +6,7 @@
 # 2. Here response function can change with time.
 
 import os
+import lal
 import bilby
 from bilby.gw.detector.interferometer import Interferometer
 from bilby.gw.detector.networks import InterferometerList, TriangularInterferometer
@@ -229,11 +230,12 @@ class SealInterferometer(Interferometer):
 
         if self.antenna_response_change:
             try:
-                tau = tau_of_f(frequencies, mc=parameters['chirp_mass'])
-            except:
                 tau = tau_of_f(
                     frequencies, m1=parameters['mass_1'], m2=parameters['mass_2']
                 )
+            except:
+                print("Using 0PN order to calculate time to merger.")
+                tau = tau_of_f(frequencies, mc=parameters['chirp_mass'])
             times = parameters['geocent_time'] - tau
             segment_starts = segmentize_tau(tau, self.antenna_response_change_timescale)
 
@@ -465,6 +467,33 @@ class SealTriangularInterferometer(InterferometerList):
             maximum_frequency = [maximum_frequency] * 3
 
         for ii in range(3):
+            '''
+            # this does not work, since LAL and bilby has different definition of x,yAZIMUTH
+            if "{}{}".format(name, ii + 1) == 'ET1':
+                latitude = lal.ET1_DETECTOR_LATITUDE_RAD * 180/ np.pi
+                longitude = lal.ET1_DETECTOR_LONGITUDE_RAD  * 180/ np.pi
+                elevation = lal.ET1_DETECTOR_ELEVATION_SI
+                xarm_azimuth = lal.ET1_DETECTOR_ARM_X_AZIMUTH_RAD * 180/ np.pi
+                yarm_azimuth = lal.ET1_DETECTOR_ARM_Y_AZIMUTH_RAD * 180/ np.pi
+                xarm_tilt = lal.ET1_DETECTOR_ARM_X_ALTITUDE_RAD * 180/ np.pi
+                yarm_tilt = lal.ET1_DETECTOR_ARM_Y_ALTITUDE_RAD * 180/ np.pi
+            if "{}{}".format(name, ii + 1) == 'ET2':
+                latitude = lal.ET2_DETECTOR_LATITUDE_RAD * 180/ np.pi
+                longitude = lal.ET2_DETECTOR_LONGITUDE_RAD  * 180/ np.pi
+                elevation = lal.ET2_DETECTOR_ELEVATION_SI
+                xarm_azimuth = lal.ET2_DETECTOR_ARM_X_AZIMUTH_RAD * 180/ np.pi
+                yarm_azimuth = lal.ET2_DETECTOR_ARM_Y_AZIMUTH_RAD * 180/ np.pi
+                xarm_tilt = lal.ET2_DETECTOR_ARM_X_ALTITUDE_RAD * 180/ np.pi
+                yarm_tilt = lal.ET2_DETECTOR_ARM_Y_ALTITUDE_RAD * 180/ np.pi
+            if "{}{}".format(name, ii + 1) == 'ET3':
+                latitude = lal.ET3_DETECTOR_LATITUDE_RAD * 180/ np.pi
+                longitude = lal.ET3_DETECTOR_LONGITUDE_RAD  * 180/ np.pi
+                elevation = lal.ET3_DETECTOR_ELEVATION_SI
+                xarm_azimuth = lal.ET3_DETECTOR_ARM_X_AZIMUTH_RAD * 180/ np.pi
+                yarm_azimuth = lal.ET3_DETECTOR_ARM_Y_AZIMUTH_RAD * 180/ np.pi
+                xarm_tilt = lal.ET3_DETECTOR_ARM_X_ALTITUDE_RAD * 180/ np.pi
+                yarm_tilt = lal.ET3_DETECTOR_ARM_Y_ALTITUDE_RAD * 180/ np.pi
+            '''
             self.append(
                 SealInterferometer(
                     "{}{}".format(name, ii + 1),
@@ -482,8 +511,9 @@ class SealTriangularInterferometer(InterferometerList):
                 )
             )
 
-            xarm_azimuth += 240
-            yarm_azimuth += 240
+            # was "+" in bilby. Changing to - could reduces the difference with LAL but still has ~1e-4 error
+            xarm_azimuth -= 240 
+            yarm_azimuth -= 240
 
             latitude += (
                 np.arctan(

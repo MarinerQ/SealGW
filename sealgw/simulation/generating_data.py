@@ -307,15 +307,12 @@ def f_of_tau(tau, m1=None, m2=None, mc=None):
 
 def tau_of_f(f, m1=None, m2=None, mc=None):
     '''
-    Maggiore, Gravtational wave, Vol. 1, eqs.(4.20) and (4.21)
+    Use 0PN if mc is provided. Otherwise use 3.5PN (TaylorF2).
     '''
     if mc is None:
-        if m1 and m2:
-            mc = (m1 * m2) ** (3 / 5) / (m1 + m2) ** (1 / 5)
-        else:
-            raise ValueError("Mass not provided.")
-
-    tau = 2.18 * (1.21 / mc) ** (5 / 3) * (100 / f) ** (8 / 3)
+        tau = bilby.gw.utils.calculate_time_to_merger(f, m1, m2)
+    else:
+        tau = 2.18 * (1.21 / mc) ** (5 / 3) * (100 / f) ** (8 / 3)
     return tau
 
 

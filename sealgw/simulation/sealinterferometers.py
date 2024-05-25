@@ -249,7 +249,13 @@ class SealInterferometer(Interferometer):
                 dec_array = np.zeros(L)+ parameters['dec']
                 psi_array = np.zeros(L)+ parameters['psi']
                 fp, fc, dt = self.antenna_func.resp_and_dt(ra_array, dec_array, times, psi_array)
-                antenna_response_array_dict = {'plus':fp, 'cross':fc}
+                antenna_response_array_dict = dict()
+                for mode in waveform_polarizations.keys():
+                    antenna_response_array_dict[mode] = np.zeros(
+                        len(waveform_polarizations[mode])
+                    )
+                antenna_response_array_dict['plus'][masked_length:] = fp
+                antenna_response_array_dict['cross'][masked_length:] = fc
                 time_shift = dt
             else: # use segment calculation. assume earth is fixed within each segment
                 print('use segment calculation. assume earth is fixed within each segment')

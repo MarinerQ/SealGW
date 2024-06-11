@@ -243,7 +243,7 @@ class SealInterferometer(Interferometer):
 
             # start calculating fp fc dt
             if self.antenna_response_change_timescale==0: # use parallel calculation for all time(freq) points
-                print('use parallel calculation for all time(freq) points')
+                #print('use parallel calculation for all time(freq) points')
                 L = len(times)
                 ra_array = np.zeros(L) + parameters['ra']
                 dec_array = np.zeros(L)+ parameters['dec']
@@ -258,7 +258,7 @@ class SealInterferometer(Interferometer):
                 antenna_response_array_dict['cross'][masked_length:] = fc
                 time_shift = dt
             else: # use segment calculation. assume earth is fixed within each segment
-                print('use segment calculation. assume earth is fixed within each segment')
+                #print('use segment calculation. assume earth is fixed within each segment')
                 segment_starts = segmentize_tau(tau, self.antenna_response_change_timescale)
 
                 antenna_response_array_dict = dict()

@@ -17,7 +17,7 @@ import time
 import lal
 import lalsimulation
 import bilby
-from gstlal import chirptime
+#from gstlal import chirptime
 
 # export OMP_NUM_THREADS=8
 LAL_DET_MAP = dict(

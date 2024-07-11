@@ -27,6 +27,7 @@ from ..calculation.localization import lal_response_function, lal_dt_function
 from .generating_data import f_of_tau, tau_of_f, segmentize_tau
 from .antenna import GWAntennaOnCPU
 
+
 class SealInterferometer(Interferometer):
     """Class for the Interferometer for SealGW. ET response function aligned with LAL's."""
 
@@ -223,32 +224,44 @@ class SealInterferometer(Interferometer):
             # !!Assume only low freqs are masked!!
             # So that masked_index + masked_length = unmasked_index
             masked_length = len(self.frequency_array) - len(frequencies)
-            
+
         else:
             mask = np.ones(len(frequencies), dtype=bool)
             masked_length = 0
 
-        
         signal = {}
         if self.antenna_response_change:
-            try:
+            if 'mass_1' in parameters.keys() and 'mass_2' in parameters.keys():
                 tau = tau_of_f(
                     frequencies, m1=parameters['mass_1'], m2=parameters['mass_2']
                 )
-            except:
+            elif (
+                'chirp_mass' in parameters.keys() and 'mass_ratio' in parameters.keys()
+            ):
+                (
+                    m1,
+                    m2,
+                ) = bilby.gw.conversion.chirp_mass_and_mass_ratio_to_component_masses(
+                    parameters['chirp_mass'], parameters['mass_ratio']
+                )
+                tau = tau_of_f(frequencies, m1=m1, m2=m2)
+            else:
                 print("Using 0PN order to calculate time to merger.")
                 tau = tau_of_f(frequencies, mc=parameters['chirp_mass'])
             times = parameters['geocent_time'] - tau
 
-
             # start calculating fp fc dt
-            if self.antenna_response_change_timescale==0: # use parallel calculation for all time(freq) points
-                #print('use parallel calculation for all time(freq) points')
+            if (
+                self.antenna_response_change_timescale == 0
+            ):  # use parallel calculation for all time(freq) points
+                # print('use parallel calculation for all time(freq) points')
                 L = len(times)
                 ra_array = np.zeros(L) + parameters['ra']
-                dec_array = np.zeros(L)+ parameters['dec']
-                psi_array = np.zeros(L)+ parameters['psi']
-                fp, fc, dt = self.antenna_func.resp_and_dt(ra_array, dec_array, times, psi_array)
+                dec_array = np.zeros(L) + parameters['dec']
+                psi_array = np.zeros(L) + parameters['psi']
+                fp, fc, dt = self.antenna_func.resp_and_dt(
+                    ra_array, dec_array, times, psi_array
+                )
                 antenna_response_array_dict = dict()
                 for mode in waveform_polarizations.keys():
                     antenna_response_array_dict[mode] = np.zeros(
@@ -257,9 +270,11 @@ class SealInterferometer(Interferometer):
                 antenna_response_array_dict['plus'][masked_length:] = fp
                 antenna_response_array_dict['cross'][masked_length:] = fc
                 time_shift = dt
-            else: # use segment calculation. assume earth is fixed within each segment
-                #print('use segment calculation. assume earth is fixed within each segment')
-                segment_starts = segmentize_tau(tau, self.antenna_response_change_timescale)
+            else:  # use segment calculation. assume earth is fixed within each segment
+                # print('use segment calculation. assume earth is fixed within each segment')
+                segment_starts = segmentize_tau(
+                    tau, self.antenna_response_change_timescale
+                )
 
                 antenna_response_array_dict = dict()
                 for mode in waveform_polarizations.keys():
@@ -316,8 +331,6 @@ class SealInterferometer(Interferometer):
 
             signal_ifo = sum(signal.values()) * mask
 
-                
-
             # Be careful to first subtract the two GPS times which are ~1e9 sec.
             # And then add the time_shift which varies at ~1e-5 sec
             dt_geocent = (
@@ -326,7 +339,7 @@ class SealInterferometer(Interferometer):
 
             dt = dt_geocent + time_shift
 
-        else: #  not include earth rotation
+        else:  #  not include earth rotation
             print('not including the earth rotation')
             for mode in waveform_polarizations.keys():
                 det_response = self.antenna_response(
@@ -537,7 +550,7 @@ class SealTriangularInterferometer(InterferometerList):
             )
 
             # was "+" in bilby. Changing to - could reduces the difference with LAL but still has ~1e-4 error
-            xarm_azimuth -= 240 
+            xarm_azimuth -= 240
             yarm_azimuth -= 240
 
             latitude += (

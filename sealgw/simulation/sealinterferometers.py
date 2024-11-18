@@ -28,7 +28,6 @@ from .generating_data import f_of_tau, tau_of_f, segmentize_tau
 from .antenna import GWAntennaOnCPU
 
 
-
 class SealInterferometer(Interferometer):
     """Class for the Interferometer for SealGW. ET response function aligned with LAL's."""
 
@@ -226,11 +225,9 @@ class SealInterferometer(Interferometer):
             # So that masked_index + masked_length = unmasked_index
             masked_length = len(self.frequency_array) - len(frequencies)
 
-
         else:
             mask = np.ones(len(frequencies), dtype=bool)
             masked_length = 0
-
 
         signal = {}
         if self.antenna_response_change:
@@ -258,18 +255,12 @@ class SealInterferometer(Interferometer):
                 self.antenna_response_change_timescale == 0
             ):  # use parallel calculation for all time(freq) points
                 # print('use parallel calculation for all time(freq) points')
-            if (
-                self.antenna_response_change_timescale == 0
-            ):  # use parallel calculation for all time(freq) points
-                print('use parallel calculation for all time(freq) points')
                 L = len(times)
                 ra_array = np.zeros(L) + parameters['ra']
-                dec_array = np.zeros(L)  + parameters['dec']
-                psi_array = np.zeros(L)  + parameters['psi']
+                dec_array = np.zeros(L) + parameters['dec']
+                psi_array = np.zeros(L) + parameters['psi']
                 fp, fc, dt = self.antenna_func.resp_and_dt(
-                    
                     ra_array, dec_array, times, psi_array
-                
                 )
                 antenna_response_array_dict = dict()
                 for mode in waveform_polarizations.keys():
@@ -279,14 +270,12 @@ class SealInterferometer(Interferometer):
                 antenna_response_array_dict['plus'][masked_length:] = fp
                 antenna_response_array_dict['cross'][masked_length:] = fc
                 time_shift = dt
-            else:   # use segment calculation. assume earth is fixed within each segment
+            else:  # use segment calculation. assume earth is fixed within each segment
                 # print(
-                    'use segment calculation. assume earth is fixed within each segment'
-                )
+                #    'use segment calculation. assume earth is fixed within each segment'
+                # )
                 segment_starts = segmentize_tau(
-                    
                     tau, self.antenna_response_change_timescale
-                
                 )
 
                 antenna_response_array_dict = dict()
@@ -353,8 +342,7 @@ class SealInterferometer(Interferometer):
             dt = dt_geocent + time_shift
 
         else:  #  not include earth rotation
-        else:  #  not include earth rotation
-            print('not including the earth rotation')
+            # print('not including the earth rotation')
             for mode in waveform_polarizations.keys():
                 det_response = self.antenna_response(
                     parameters['ra'],
